@@ -1,0 +1,6 @@
+ID,Status,Filter_1,Filter_2,Filter_3,Filter_4,Filter_5,Filter_6,Filter_7,Filter_8,Filter_9,Filter_10,Filter_11,Filter_12,Filter_13,Filter_14,Filter_15,Filter_16,Filter_17,Filter_18,Filter_19,Filter_20,Failed_Filter_Count,All_Filters_Pass,Any_Filter_Fail,Status_Matches_AllFilters,Failed_Filter_Count_17,All_17_Filters_Pass,Any_17_Filter_Fail
+1,Pass,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,0,True,False,True,0,True,False
+2,Fail,True,False,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,1,False,True,False,1,False,True
+3,Pass,False,False,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,2,False,True,False,2,False,True
+4,Pass,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,0,True,False,True,0,True,False
+5,Fail,True,True,False,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,1,False,True,False,1,False,True
