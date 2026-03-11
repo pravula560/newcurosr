@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Walkback SMS Test vs Control Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #38bdf8;
+      --test: #10b981;
+      --control: #f59e0b;
+      --danger: #ef4444;
+      --ok: #22c55e;
+      --border: #374151;
+    }
+    * {
+      box-sizing: border-box;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, #0b1021 0%, #111827 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .header p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(130px, 1fr));
+      gap: 10px;
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .control {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .control label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .control input,
+    .control select,
+    .control button {
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+    .control button {
+      cursor: pointer;
+      font-weight: 600;
+      transition: 0.2s;
+    }
+    .control button:hover {
+      border-color: var(--accent);
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .kpi {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(17, 24, 39, 0.9);
+      padding: 12px;
+    }
+    .kpi h3 {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .kpi .value {
+      margin-top: 8px;
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .kpi .sub {
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .lift-positive { color: var(--ok); }
+    .lift-negative { color: var(--danger); }
+
+    .charts {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(17, 24, 39, 0.9);
+      padding: 12px;
+    }
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    canvas {
+      width: 100% !important;
+      height: 290px !important;
+    }
+    .table-wrap {
+      overflow: auto;
+      max-height: 360px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #273244;
+      text-align: right;
+      white-space: nowrap;
+    }
+    th:first-child, td:first-child { text-align: left; }
+    th {
+      position: sticky;
+      top: 0;
+      background: #111827;
+      color: #cbd5e1;
+      z-index: 1;
+    }
+    .status {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    @media (max-width: 1100px) {
+      .controls { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+      .kpis { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+      .charts { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Walkback SMS - Test vs Control Dashboard</h1>
+      <p>
+        Direct BigQuery dashboard for
+        <code>ffam-data-platform-loan-ops.report_views.v_apl_walkback_sms</code>
+        with live test-vs-control visualizations.
+      </p>
+    </div>
+
+    <div class="controls">
+      <div class="control">
+        <label>BigQuery Project ID</label>
+        <input type="text" id="bqProjectId" value="ffam-data-platform-loan-ops" placeholder="your-gcp-project-id" />
+      </div>
+      <div class="control">
+        <label>OAuth Client ID</label>
+        <input type="text" id="oauthClientId" placeholder="xxxx.apps.googleusercontent.com" />
+      </div>
+      <div class="control">
+        <label>BigQuery Location</label>
+        <input type="text" id="bqLocation" value="US" />
+      </div>
+      <div class="control">
+        <label>Start Date (optional for live query)</label>
+        <input type="date" id="startDate" />
+      </div>
+      <div class="control">
+        <label>End Date (optional for live query)</label>
+        <input type="date" id="endDate" />
+      </div>
+      <div class="control">
+        <label>UTM Channel</label>
+        <select id="utmChannel"></select>
+      </div>
+      <div class="control">
+        <label>FICO Band</label>
+        <select id="ficoBand"></select>
+      </div>
+      <div class="control">
+        <label>Loan Officer</label>
+        <select id="loanOfficer"></select>
+      </div>
+      <div class="control">
+        <label>UTM Source</label>
+        <select id="utmSource"></select>
+      </div>
+      <div class="control">
+        <label>Parity Group</label>
+        <select id="parityGroup"></select>
+      </div>
+      <div class="control">
+        <label>Actions</label>
+        <button id="loadFromViewBtn" type="button">Load from Provided View</button>
+      </div>
+      <div class="control">
+        <label>&nbsp;</label>
+        <button id="applyBtn" type="button">Apply Filters</button>
+      </div>
+      <div class="control">
+        <label>&nbsp;</label>
+        <button id="resetBtn" type="button">Reset Filters</button>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><h3>Doc Collection Lift (pp)</h3><div id="kpiDocLift" class="value">-</div><div id="kpiDocLiftSub" class="sub">test vs control</div></div>
+      <div class="kpi"><h3>Take Rate Lift (pp)</h3><div id="kpiTakeLift" class="value">-</div><div class="sub">test vs control</div></div>
+      <div class="kpi"><h3>Conversion Lift (pp)</h3><div id="kpiConvLift" class="value">-</div><div class="sub">test vs control</div></div>
+      <div class="kpi"><h3>Test FAS Units</h3><div id="kpiTestFas" class="value">-</div><div class="sub">eligible applications</div></div>
+      <div class="kpi"><h3>Control FAS Units</h3><div id="kpiControlFas" class="value">-</div><div class="sub">eligible applications</div></div>
+      <div class="kpi"><h3>$ Funded Lift</h3><div id="kpiDollarLift" class="value">-</div><div class="sub">test - control</div></div>
+    </div>
+
+    <div class="charts">
+      <div class="panel">
+        <h2>Daily Doc Collection Rate - Test vs Control</h2>
+        <canvas id="dailyTrendChart"></canvas>
+      </div>
+      <div class="panel">
+        <h2>KPI Rate Comparison</h2>
+        <canvas id="kpiCompareChart"></canvas>
+      </div>
+    </div>
+
+    <div class="charts">
+      <div class="panel">
+        <h2>UTM Channel Performance (Doc Collection Rate)</h2>
+        <canvas id="channelChart"></canvas>
+      </div>
+      <div class="panel">
+        <h2>FICO Band Performance (Doc Collection Rate)</h2>
+        <canvas id="ficoChart"></canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Loan Officer Performance Table (Test vs Control)</h2>
+      <div class="table-wrap">
+        <table id="loTable">
+          <thead>
+            <tr>
+              <th>Loan Officer</th>
+              <th>Group</th>
+              <th>FAS</th>
+              <th>Doc Collection Rate</th>
+              <th>Take Rate</th>
+              <th>Conversion Rate</th>
+              <th>$ Funded</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="status" class="status">
+        Live mode uses the provided BigQuery view and refreshes all report visualizations.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      data: [],
+      filtered: [],
+      charts: {},
+      tokenClient: null,
+      accessToken: "",
+      oauthClientId: "",
+      lastLoadSource: "BigQuery view"
+    };
+
+    const REQUIRED_COLUMNS = [
+      "day", "utm_channel", "utm_source", "fico_band", "loan_officer_name",
+      "delivery_group", "parity_group", "fas_units", "docs_collected_units",
+      "take_units", "units_funded", "dollars_funded"
+    ];
+
+    const demoCsv = `day,utm_channel,utm_source,fico_band,loan_officer_name,delivery_group,parity_group,fas_units,docs_collected_units,take_units,units_funded,dollars_funded
+2026-02-01,paid_search,google,680-719,Alex Smith,test,test_odd,24,10,8,6,92000
+2026-02-01,paid_search,google,680-719,Alex Smith,control,control_even,23,7,6,4,62000
+2026-02-02,affiliate,bankrate,640-679,Nina Patel,test,test_odd,21,9,6,5,71000
+2026-02-02,affiliate,bankrate,640-679,Nina Patel,control,control_even,20,6,5,3,39000
+2026-02-03,direct,direct,720+,Omar Lee,test,test_odd,19,10,9,7,125000
+2026-02-03,direct,direct,720+,Omar Lee,control,control_even,18,7,6,5,98000
+2026-02-04,email,crm,680-719,Alex Smith,test,test_odd,17,8,7,5,79000
+2026-02-04,email,crm,680-719,Alex Smith,control,control_even,16,6,5,3,43000
+2026-02-05,paid_social,meta,640-679,Nina Patel,test,test_odd,14,5,4,3,41000
+2026-02-05,paid_social,meta,640-679,Nina Patel,control,control_even,15,4,3,2,26000`;
+
+    function setStatus(text) {
+      document.getElementById("status").textContent = text;
+    }
+
+    function parseCsvLine(line) {
+      const out = [];
+      let cur = "";
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"' && line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else if (ch === '"') {
+          inQuotes = !inQuotes;
+        } else if (ch === "," && !inQuotes) {
+          out.push(cur.trim());
+          cur = "";
+        } else {
+          cur += ch;
+        }
+      }
+      out.push(cur.trim());
+      return out;
+    }
+
+    function parseCsv(csvText) {
+      const lines = csvText.replace(/\r/g, "").split("\n").filter(Boolean);
+      if (lines.length < 2) return [];
+      const headers = parseCsvLine(lines[0]).map((h) => h.trim());
+      const rows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const fields = parseCsvLine(lines[i]);
+        const row = {};
+        headers.forEach((h, idx) => { row[h] = fields[idx] ?? ""; });
+        rows.push(row);
+      }
+      return rows;
+    }
+
+    function toNumber(val) {
+      const n = Number(val);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function normalizeRows(rows) {
+      return rows.map((r) => ({
+        day: r.day,
+        utm_channel: r.utm_channel || "Unknown",
+        utm_source: r.utm_source || "Unknown",
+        fico_band: r.fico_band || "Unknown",
+        loan_officer_name: r.loan_officer_name || "Unassigned",
+        delivery_group: (r.delivery_group || "").toLowerCase(),
+        parity_group: r.parity_group || "unknown",
+        fas_units: toNumber(r.fas_units),
+        docs_collected_units: toNumber(r.docs_collected_units),
+        take_units: toNumber(r.take_units),
+        units_funded: toNumber(r.units_funded),
+        dollars_funded: toNumber(r.dollars_funded)
+      }));
+    }
+
+    function missingColumns(rows) {
+      if (!rows.length) return REQUIRED_COLUMNS;
+      const keys = Object.keys(rows[0]);
+      return REQUIRED_COLUMNS.filter((c) => !keys.includes(c));
+    }
+
+    function uniqueVals(data, key) {
+      return ["All", ...new Set(data.map((r) => r[key]).filter(Boolean))];
+    }
+
+    function fillSelect(id, values) {
+      const el = document.getElementById(id);
+      const current = el.value;
+      el.innerHTML = values.map((v) => `<option value="${v}">${v}</option>`).join("");
+      if (values.includes(current)) el.value = current;
+    }
+
+    function initFilters(data) {
+      fillSelect("utmChannel", uniqueVals(data, "utm_channel"));
+      fillSelect("utmSource", uniqueVals(data, "utm_source"));
+      fillSelect("ficoBand", uniqueVals(data, "fico_band"));
+      fillSelect("loanOfficer", uniqueVals(data, "loan_officer_name"));
+      fillSelect("parityGroup", uniqueVals(data, "parity_group"));
+
+      const dates = [...new Set(data.map((r) => r.day).filter(Boolean))].sort();
+      if (dates.length) {
+        if (!document.getElementById("startDate").value) {
+          document.getElementById("startDate").value = dates[0];
+        }
+        if (!document.getElementById("endDate").value) {
+          document.getElementById("endDate").value = dates[dates.length - 1];
+        }
+      }
+    }
+
+    function filterData(data) {
+      const start = document.getElementById("startDate").value;
+      const end = document.getElementById("endDate").value;
+      const channel = document.getElementById("utmChannel").value;
+      const source = document.getElementById("utmSource").value;
+      const fico = document.getElementById("ficoBand").value;
+      const lo = document.getElementById("loanOfficer").value;
+      const parity = document.getElementById("parityGroup").value;
+
+      return data.filter((r) => {
+        if (start && r.day < start) return false;
+        if (end && r.day > end) return false;
+        if (channel !== "All" && r.utm_channel !== channel) return false;
+        if (source !== "All" && r.utm_source !== source) return false;
+        if (fico !== "All" && r.fico_band !== fico) return false;
+        if (lo !== "All" && r.loan_officer_name !== lo) return false;
+        if (parity !== "All" && r.parity_group !== parity) return false;
+        return true;
+      });
+    }
+
+    function blankAgg() {
+      return { fas: 0, docs: 0, take: 0, funded: 0, dollars: 0 };
+    }
+
+    function aggregateByGroup(rows) {
+      const out = { test: blankAgg(), control: blankAgg() };
+      for (const r of rows) {
+        const grp = r.delivery_group === "test" ? "test" : "control";
+        out[grp].fas += r.fas_units;
+        out[grp].docs += r.docs_collected_units;
+        out[grp].take += r.take_units;
+        out[grp].funded += r.units_funded;
+        out[grp].dollars += r.dollars_funded;
+      }
+      return out;
+    }
+
+    function rate(num, den) {
+      return den > 0 ? num / den : 0;
+    }
+
+    function pct(v) {
+      return `${(v * 100).toFixed(2)}%`;
+    }
+
+    function pp(testRate, controlRate) {
+      return (100 * (testRate - controlRate)).toFixed(2);
+    }
+
+    function fmtInt(n) {
+      return n.toLocaleString();
+    }
+
+    function fmtMoney(n) {
+      return `$${Math.round(n).toLocaleString()}`;
+    }
+
+    function setLiftText(elId, value) {
+      const el = document.getElementById(elId);
+      const n = Number(String(value).replace(/[^0-9.-]/g, ""));
+      el.textContent = `${n >= 0 ? "+" : ""}${value}`;
+      el.classList.remove("lift-positive", "lift-negative");
+      el.classList.add(n >= 0 ? "lift-positive" : "lift-negative");
+    }
+
+    function updateKpis(rows) {
+      const agg = aggregateByGroup(rows);
+      const tr = {
+        doc: rate(agg.test.docs, agg.test.fas),
+        take: rate(agg.test.take, agg.test.fas),
+        conv: rate(agg.test.funded, agg.test.fas)
+      };
+      const cr = {
+        doc: rate(agg.control.docs, agg.control.fas),
+        take: rate(agg.control.take, agg.control.fas),
+        conv: rate(agg.control.funded, agg.control.fas)
+      };
+
+      setLiftText("kpiDocLift", `${pp(tr.doc, cr.doc)} pp`);
+      setLiftText("kpiTakeLift", `${pp(tr.take, cr.take)} pp`);
+      setLiftText("kpiConvLift", `${pp(tr.conv, cr.conv)} pp`);
+      document.getElementById("kpiTestFas").textContent = fmtInt(agg.test.fas);
+      document.getElementById("kpiControlFas").textContent = fmtInt(agg.control.fas);
+      setLiftText("kpiDollarLift", fmtMoney(agg.test.dollars - agg.control.dollars));
+      document.getElementById("kpiDocLiftSub").textContent =
+        `test ${pct(tr.doc)} vs control ${pct(cr.doc)}`;
+    }
+
+    function byDay(rows) {
+      const map = new Map();
+      for (const r of rows) {
+        if (!map.has(r.day)) map.set(r.day, { test: blankAgg(), control: blankAgg() });
+        const group = r.delivery_group === "test" ? "test" : "control";
+        const o = map.get(r.day)[group];
+        o.fas += r.fas_units;
+        o.docs += r.docs_collected_units;
+      }
+      const days = [...map.keys()].sort();
+      const test = days.map((d) => rate(map.get(d).test.docs, map.get(d).test.fas));
+      const control = days.map((d) => rate(map.get(d).control.docs, map.get(d).control.fas));
+      return { days, test, control };
+    }
+
+    function byDimension(rows, key) {
+      const map = new Map();
+      for (const r of rows) {
+        if (!map.has(r[key])) map.set(r[key], { test: blankAgg(), control: blankAgg() });
+        const group = r.delivery_group === "test" ? "test" : "control";
+        const o = map.get(r[key])[group];
+        o.fas += r.fas_units;
+        o.docs += r.docs_collected_units;
+      }
+      const labels = [...map.keys()].sort();
+      return {
+        labels,
+        test: labels.map((k) => rate(map.get(k).test.docs, map.get(k).test.fas)),
+        control: labels.map((k) => rate(map.get(k).control.docs, map.get(k).control.fas))
+      };
+    }
+
+    function destroyCharts() {
+      Object.values(state.charts).forEach((c) => c && c.destroy());
+      state.charts = {};
+    }
+
+    function buildCharts(rows) {
+      destroyCharts();
+      const daily = byDay(rows);
+
+      state.charts.dailyTrend = new Chart(document.getElementById("dailyTrendChart"), {
+        type: "line",
+        data: {
+          labels: daily.days,
+          datasets: [
+            { label: "Test", data: daily.test, borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.2)", tension: 0.3 },
+            { label: "Control", data: daily.control, borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.2)", tension: 0.3 }
+          ]
+        },
+        options: {
+          responsive: true,
+          scales: { y: { ticks: { callback: (v) => `${(v * 100).toFixed(0)}%` } } },
+          plugins: { legend: { labels: { color: "#e5e7eb" } } }
+        }
+      });
+
+      const agg = aggregateByGroup(rows);
+      const testRates = [
+        rate(agg.test.docs, agg.test.fas),
+        rate(agg.test.take, agg.test.fas),
+        rate(agg.test.funded, agg.test.fas)
+      ];
+      const controlRates = [
+        rate(agg.control.docs, agg.control.fas),
+        rate(agg.control.take, agg.control.fas),
+        rate(agg.control.funded, agg.control.fas)
+      ];
+
+      state.charts.kpiCompare = new Chart(document.getElementById("kpiCompareChart"), {
+        type: "bar",
+        data: {
+          labels: ["Doc Collection", "Take Rate", "Conversion"],
+          datasets: [
+            { label: "Test", data: testRates, backgroundColor: "#10b981" },
+            { label: "Control", data: controlRates, backgroundColor: "#f59e0b" }
+          ]
+        },
+        options: {
+          indexAxis: "y",
+          scales: { x: { ticks: { callback: (v) => `${(v * 100).toFixed(0)}%` } } },
+          plugins: { legend: { labels: { color: "#e5e7eb" } } }
+        }
+      });
+
+      const channel = byDimension(rows, "utm_channel");
+      state.charts.channel = new Chart(document.getElementById("channelChart"), {
+        type: "bar",
+        data: {
+          labels: channel.labels,
+          datasets: [
+            { label: "Test", data: channel.test, backgroundColor: "#10b981" },
+            { label: "Control", data: channel.control, backgroundColor: "#f59e0b" }
+          ]
+        },
+        options: {
+          scales: { y: { ticks: { callback: (v) => `${(v * 100).toFixed(0)}%` } } },
+          plugins: { legend: { labels: { color: "#e5e7eb" } } }
+        }
+      });
+
+      const fico = byDimension(rows, "fico_band");
+      state.charts.fico = new Chart(document.getElementById("ficoChart"), {
+        type: "bar",
+        data: {
+          labels: fico.labels,
+          datasets: [
+            { label: "Test", data: fico.test, backgroundColor: "#10b981" },
+            { label: "Control", data: fico.control, backgroundColor: "#f59e0b" }
+          ]
+        },
+        options: {
+          scales: { y: { ticks: { callback: (v) => `${(v * 100).toFixed(0)}%` } } },
+          plugins: { legend: { labels: { color: "#e5e7eb" } } }
+        }
+      });
+    }
+
+    function buildLoanOfficerTable(rows) {
+      const map = new Map();
+      for (const r of rows) {
+        const key = `${r.loan_officer_name}|${r.delivery_group}`;
+        if (!map.has(key)) {
+          map.set(key, { ...blankAgg(), loan_officer_name: r.loan_officer_name, delivery_group: r.delivery_group });
+        }
+        const o = map.get(key);
+        o.fas += r.fas_units;
+        o.docs += r.docs_collected_units;
+        o.take += r.take_units;
+        o.funded += r.units_funded;
+        o.dollars += r.dollars_funded;
+      }
+      const rowsAgg = [...map.values()].sort(
+        (a, b) => a.loan_officer_name.localeCompare(b.loan_officer_name) || a.delivery_group.localeCompare(b.delivery_group)
+      );
+      const tbody = document.querySelector("#loTable tbody");
+      tbody.innerHTML = rowsAgg.map((r) => `
+        <tr>
+          <td>${r.loan_officer_name}</td>
+          <td>${r.delivery_group}</td>
+          <td>${fmtInt(r.fas)}</td>
+          <td>${pct(rate(r.docs, r.fas))}</td>
+          <td>${pct(rate(r.take, r.fas))}</td>
+          <td>${pct(rate(r.funded, r.fas))}</td>
+          <td>${fmtMoney(r.dollars)}</td>
+        </tr>
+      `).join("");
+    }
+
+    function render() {
+      state.filtered = filterData(state.data);
+      updateKpis(state.filtered);
+      buildCharts(state.filtered);
+      buildLoanOfficerTable(state.filtered);
+      setStatus(
+        `Loaded ${state.data.length.toLocaleString()} rows from ${state.lastLoadSource} | ` +
+        `Filtered ${state.filtered.length.toLocaleString()} rows`
+      );
+    }
+
+    function loadRows(rows, sourceLabel) {
+      const missing = missingColumns(rows);
+      if (missing.length) {
+        setStatus(`Missing required columns: ${missing.join(", ")}`);
+        return;
+      }
+      state.data = normalizeRows(rows);
+      state.lastLoadSource = sourceLabel;
+      initFilters(state.data);
+      render();
+    }
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function validDateText(v) {
+      return /^\d{4}-\d{2}-\d{2}$/.test(v);
+    }
+
+    function buildLiveQuery(startDate, endDate) {
+      const hasStart = validDateText(startDate);
+      const hasEnd = validDateText(endDate);
+      let dateFilter = `
+    fas_day >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH)
+    AND fas_day < DATE_TRUNC(CURRENT_DATE(), MONTH)`;
+      if (hasStart || hasEnd) {
+        const start = hasStart ? startDate : "1900-01-01";
+        const end = hasEnd ? endDate : "2999-12-31";
+        dateFilter = `
+    fas_day >= DATE('${start}')
+    AND fas_day <= DATE('${end}')`;
+      }
+
+      return `WITH source_data AS (
+  SELECT
+    application_id,
+    application_number,
+    full_app_submitted_datetime,
+    DATE(full_app_submitted_datetime) AS fas_day,
+    app_stage_name,
+    app_stage_status,
+    app_general_status,
+    app_history_start_datetime,
+    COALESCE(app_history_end_datetime, CURRENT_TIMESTAMP()) AS app_history_end_datetime,
+    state,
+    LOWER(COALESCE(utm_source, '')) AS utm_source,
+    COALESCE(utm_channel, 'Unknown') AS utm_channel,
+    COALESCE(fico_band, 'Unknown') AS fico_band,
+    COALESCE(loan_officer_name, 'Unassigned') AS loan_officer_name,
+    template_name,
+    sms_sent_datetime,
+    fullapp_docs_for_uw_received_datetime,
+    offer_accepted_datetime,
+    funded_datetime,
+    COALESCE(funded_amount, 0) AS funded_amount
+  FROM \`ffam-data-platform-loan-ops.report_views.v_apl_walkback_sms\`
+),
+eligible_apps AS (
+  SELECT DISTINCT
+    application_id
+  FROM source_data
+  WHERE app_stage_name = 'Full App Submitted'
+    AND app_stage_status = 'In Process'
+    AND LOWER(COALESCE(app_general_status, '')) = 'active'
+    AND TIMESTAMP_DIFF(app_history_end_datetime, app_history_start_datetime, HOUR) >= 24
+    AND state NOT IN ('IA', 'WA')
+    AND NOT REGEXP_CONTAINS(utm_source, r'(refi|ula|mptestutm|reload|achieve_bankrate_ahl)')
+),
+app_level AS (
+  SELECT
+    s.application_id,
+    ANY_VALUE(s.application_number) AS application_number,
+    ANY_VALUE(s.fas_day) AS fas_day,
+    ANY_VALUE(s.utm_channel) AS utm_channel,
+    ANY_VALUE(s.utm_source) AS utm_source,
+    ANY_VALUE(s.fico_band) AS fico_band,
+    ANY_VALUE(s.loan_officer_name) AS loan_officer_name,
+    MAX(CASE WHEN LOWER(COALESCE(s.template_name, '')) LIKE '%walkback%' THEN 1 ELSE 0 END) AS received_walkback_sms,
+    MAX(CASE WHEN s.fullapp_docs_for_uw_received_datetime IS NOT NULL THEN 1 ELSE 0 END) AS docs_collected_flag,
+    MAX(CASE WHEN s.offer_accepted_datetime IS NOT NULL THEN 1 ELSE 0 END) AS take_flag,
+    MAX(CASE WHEN s.funded_datetime IS NOT NULL THEN 1 ELSE 0 END) AS funded_flag,
+    MAX(CASE WHEN s.funded_datetime IS NOT NULL THEN s.funded_amount ELSE 0 END) AS funded_amount
+  FROM source_data s
+  INNER JOIN eligible_apps e
+    ON s.application_id = e.application_id
+  GROUP BY s.application_id
+),
+scored AS (
+  SELECT
+    *,
+    CASE
+      WHEN MOD(SAFE_CAST(REGEXP_EXTRACT(CAST(application_number AS STRING), r'(\\d+)$') AS INT64), 2) = 1
+        THEN 'test_odd'
+      ELSE 'control_even'
+    END AS parity_group,
+    CASE WHEN received_walkback_sms = 1 THEN 'test' ELSE 'control' END AS delivery_group
+  FROM app_level
+)
+SELECT
+  fas_day AS day,
+  utm_channel,
+  utm_source,
+  fico_band,
+  loan_officer_name,
+  delivery_group,
+  parity_group,
+  COUNT(DISTINCT application_id) AS fas_units,
+  COUNT(DISTINCT IF(docs_collected_flag = 1, application_id, NULL)) AS docs_collected_units,
+  COUNT(DISTINCT IF(take_flag = 1, application_id, NULL)) AS take_units,
+  COUNT(DISTINCT IF(funded_flag = 1, application_id, NULL)) AS units_funded,
+  SUM(IF(funded_flag = 1, funded_amount, 0)) AS dollars_funded
+FROM scored
+WHERE ${dateFilter}
+GROUP BY day, utm_channel, utm_source, fico_band, loan_officer_name, delivery_group, parity_group
+ORDER BY day, utm_channel, utm_source, fico_band, loan_officer_name, delivery_group, parity_group`;
+    }
+
+    function parseBqValue(fieldType, rawValue) {
+      if (rawValue === null || rawValue === undefined) return "";
+      const type = String(fieldType || "").toUpperCase();
+      if (["INTEGER", "INT64", "FLOAT", "FLOAT64", "NUMERIC", "BIGNUMERIC"].includes(type)) {
+        return toNumber(rawValue);
+      }
+      return rawValue;
+    }
+
+    function parseBqRows(rows, fields) {
+      if (!rows || !fields) return [];
+      return rows.map((row) => {
+        const out = {};
+        fields.forEach((field, idx) => {
+          out[field.name] = parseBqValue(field.type, row.f?.[idx]?.v);
+        });
+        return out;
+      });
+    }
+
+    async function bqFetch(url, token, bodyObj) {
+      const response = await fetch(url, {
+        method: bodyObj ? "POST" : "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: bodyObj ? JSON.stringify(bodyObj) : undefined
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error?.message || `BigQuery API error (${response.status})`);
+      }
+      return payload;
+    }
+
+    async function runBigQueryQuery(projectId, location, token, sql) {
+      const encodedProject = encodeURIComponent(projectId);
+      const firstUrl = `https://bigquery.googleapis.com/bigquery/v2/projects/${encodedProject}/queries`;
+      let payload = await bqFetch(firstUrl, token, {
+        query: sql,
+        useLegacySql: false,
+        location,
+        maxResults: 20000
+      });
+
+      const jobId = payload.jobReference?.jobId;
+      if (!jobId) {
+        throw new Error("Missing BigQuery job id in response.");
+      }
+
+      const queryUrl = (pageToken = "") => {
+        const params = new URLSearchParams({ location, maxResults: "20000" });
+        if (pageToken) params.set("pageToken", pageToken);
+        return `https://bigquery.googleapis.com/bigquery/v2/projects/${encodedProject}/queries/${encodeURIComponent(jobId)}?${params.toString()}`;
+      };
+
+      while (payload.jobComplete === false) {
+        await sleep(1000);
+        payload = await bqFetch(queryUrl(), token);
+      }
+
+      let fields = payload.schema?.fields || [];
+      let rows = parseBqRows(payload.rows || [], fields);
+      let pageToken = payload.pageToken;
+
+      while (pageToken) {
+        const next = await bqFetch(queryUrl(pageToken), token);
+        if (!fields.length && next.schema?.fields) fields = next.schema.fields;
+        rows = rows.concat(parseBqRows(next.rows || [], fields));
+        pageToken = next.pageToken;
+      }
+
+      return rows;
+    }
+
+    function saveBqConfig() {
+      localStorage.setItem("walkback_bq_project_id", document.getElementById("bqProjectId").value.trim());
+      localStorage.setItem("walkback_bq_client_id", document.getElementById("oauthClientId").value.trim());
+      localStorage.setItem("walkback_bq_location", document.getElementById("bqLocation").value.trim());
+    }
+
+    function restoreBqConfig() {
+      const projectInput = document.getElementById("bqProjectId");
+      const clientInput = document.getElementById("oauthClientId");
+      const locationInput = document.getElementById("bqLocation");
+      projectInput.value = localStorage.getItem("walkback_bq_project_id") || projectInput.value || "";
+      clientInput.value = localStorage.getItem("walkback_bq_client_id") || clientInput.value || "";
+      locationInput.value = localStorage.getItem("walkback_bq_location") || locationInput.value || "US";
+    }
+
+    async function getAccessToken(clientId) {
+      if (!window.google || !google.accounts || !google.accounts.oauth2) {
+        throw new Error("Google Identity script not ready yet. Refresh and try again.");
+      }
+
+      if (!state.tokenClient || state.oauthClientId !== clientId) {
+        state.oauthClientId = clientId;
+        state.tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: "https://www.googleapis.com/auth/bigquery https://www.googleapis.com/auth/cloud-platform",
+          callback: () => {}
+        });
+      }
+
+      return new Promise((resolve, reject) => {
+        state.tokenClient.callback = (response) => {
+          if (response.error) {
+            reject(new Error(response.error_description || response.error));
+            return;
+          }
+          state.accessToken = response.access_token;
+          resolve(response.access_token);
+        };
+        state.tokenClient.requestAccessToken({ prompt: state.accessToken ? "" : "consent" });
+      });
+    }
+
+    async function loadFromProvidedView() {
+      const projectId = document.getElementById("bqProjectId").value.trim();
+      const clientId = document.getElementById("oauthClientId").value.trim();
+      const location = (document.getElementById("bqLocation").value.trim() || "US");
+      const start = document.getElementById("startDate").value;
+      const end = document.getElementById("endDate").value;
+
+      if (!projectId || !clientId) {
+        setStatus("Enter BigQuery Project ID and OAuth Client ID, then click Load from Provided View.");
+        return;
+      }
+
+      try {
+        saveBqConfig();
+        setStatus("Requesting Google OAuth token...");
+        const token = await getAccessToken(clientId);
+        const sql = buildLiveQuery(start, end);
+        setStatus("Running query on v_apl_walkback_sms...");
+        const rows = await runBigQueryQuery(projectId, location, token, sql);
+        if (!rows.length) {
+          setStatus("Query completed with 0 rows for current date window/filters.");
+          return;
+        }
+        loadRows(rows, "BigQuery view");
+      } catch (error) {
+        setStatus(`Live query failed: ${error.message}`);
+      }
+    }
+
+    document.getElementById("loadFromViewBtn").addEventListener("click", () => {
+      loadFromProvidedView();
+    });
+
+    document.getElementById("applyBtn").addEventListener("click", () => render());
+
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      ["utmChannel", "utmSource", "ficoBand", "loanOfficer", "parityGroup"].forEach((id) => {
+        document.getElementById(id).value = "All";
+      });
+      initFilters(state.data);
+      render();
+    });
+
+    restoreBqConfig();
+    setStatus("Enter OAuth Client ID, then click Load from Provided View.");
+    if (document.getElementById("oauthClientId").value.trim()) {
+      loadFromProvidedView();
+    }
+  </script>
+</body>
+</html>
