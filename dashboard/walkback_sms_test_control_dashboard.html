@@ -183,19 +183,16 @@
     <div class="header">
       <h1>Walkback SMS - Test vs Control Dashboard</h1>
       <p>
-        Load live data from <code>ffam-data-platform-loan-ops.report_views.v_apl_walkback_sms</code>
-        (OAuth + BigQuery) or upload CSV from <code>v_apl_walkback_sms_dashboard.sql</code>.
+        Direct BigQuery dashboard for
+        <code>ffam-data-platform-loan-ops.report_views.v_apl_walkback_sms</code>
+        with live test-vs-control visualizations.
       </p>
     </div>
 
     <div class="controls">
       <div class="control">
-        <label>Upload CSV</label>
-        <input type="file" id="csvFile" accept=".csv" />
-      </div>
-      <div class="control">
         <label>BigQuery Project ID</label>
-        <input type="text" id="bqProjectId" placeholder="your-gcp-project-id" />
+        <input type="text" id="bqProjectId" value="ffam-data-platform-loan-ops" placeholder="your-gcp-project-id" />
       </div>
       <div class="control">
         <label>OAuth Client ID</label>
@@ -236,10 +233,6 @@
       <div class="control">
         <label>Actions</label>
         <button id="loadFromViewBtn" type="button">Load from Provided View</button>
-      </div>
-      <div class="control">
-        <label>&nbsp;</label>
-        <button id="loadDemoBtn" type="button">Load Demo Data</button>
       </div>
       <div class="control">
         <label>&nbsp;</label>
@@ -301,9 +294,7 @@
         </table>
       </div>
       <div id="status" class="status">
-        Use "Load from Provided View" for live BigQuery data, or upload CSV with columns:
-        day, utm_channel, utm_source, fico_band, loan_officer_name, delivery_group, parity_group,
-        fas_units, docs_collected_units, take_units, units_funded, dollars_funded.
+        Live mode uses the provided BigQuery view and refreshes all report visualizations.
       </div>
     </div>
   </div>
@@ -316,7 +307,7 @@
       tokenClient: null,
       accessToken: "",
       oauthClientId: "",
-      lastLoadSource: "demo"
+      lastLoadSource: "BigQuery view"
     };
 
     const REQUIRED_COLUMNS = [
@@ -884,9 +875,12 @@ ORDER BY day, utm_channel, utm_source, fico_band, loan_officer_name, delivery_gr
     }
 
     function restoreBqConfig() {
-      document.getElementById("bqProjectId").value = localStorage.getItem("walkback_bq_project_id") || "";
-      document.getElementById("oauthClientId").value = localStorage.getItem("walkback_bq_client_id") || "";
-      document.getElementById("bqLocation").value = localStorage.getItem("walkback_bq_location") || "US";
+      const projectInput = document.getElementById("bqProjectId");
+      const clientInput = document.getElementById("oauthClientId");
+      const locationInput = document.getElementById("bqLocation");
+      projectInput.value = localStorage.getItem("walkback_bq_project_id") || projectInput.value || "";
+      clientInput.value = localStorage.getItem("walkback_bq_client_id") || clientInput.value || "";
+      locationInput.value = localStorage.getItem("walkback_bq_location") || locationInput.value || "US";
     }
 
     async function getAccessToken(clientId) {
@@ -945,14 +939,6 @@ ORDER BY day, utm_channel, utm_source, fico_band, loan_officer_name, delivery_gr
       }
     }
 
-    document.getElementById("csvFile").addEventListener("change", (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => loadRows(parseCsv(String(reader.result)), "CSV upload");
-      reader.readAsText(file);
-    });
-
     document.getElementById("loadFromViewBtn").addEventListener("click", () => {
       loadFromProvidedView();
     });
@@ -967,12 +953,11 @@ ORDER BY day, utm_channel, utm_source, fico_band, loan_officer_name, delivery_gr
       render();
     });
 
-    document.getElementById("loadDemoBtn").addEventListener("click", () => {
-      loadRows(parseCsv(demoCsv), "demo");
-    });
-
     restoreBqConfig();
-    loadRows(parseCsv(demoCsv), "demo");
+    setStatus("Enter OAuth Client ID, then click Load from Provided View.");
+    if (document.getElementById("oauthClientId").value.trim()) {
+      loadFromProvidedView();
+    }
   </script>
 </body>
 </html>

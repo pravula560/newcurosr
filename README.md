@@ -18,8 +18,8 @@ The HTML dashboard can query the provided view directly:
 To use live mode:
 
 1. Open the HTML file in a browser.
-2. Enter your BigQuery project ID and OAuth client ID.
-3. Click **Load from Provided View**.
+2. Enter your OAuth client ID (project/location default to the provided view project).
+3. Click **Load from Provided View** (or it auto-loads if OAuth client ID is already saved).
 
 OAuth scope used by the page:
 
