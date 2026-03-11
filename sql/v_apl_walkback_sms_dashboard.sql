@@ -76,7 +76,7 @@ scored AS (
   SELECT
     *,
     CASE
-      WHEN MOD(CAST(REGEXP_EXTRACT(CAST(application_number AS STRING), r'(\d+)$') AS INT64), 2) = 1
+      WHEN MOD(SAFE_CAST(REGEXP_EXTRACT(CAST(application_number AS STRING), r'(\d+)$') AS INT64), 2) = 1
         THEN 'test_odd'
       ELSE 'control_even'
     END AS parity_group,
