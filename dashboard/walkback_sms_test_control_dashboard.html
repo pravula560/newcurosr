@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Walkback SMS Test vs Control Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     :root {
       --bg: #0f172a;
@@ -182,8 +183,8 @@
     <div class="header">
       <h1>Walkback SMS - Test vs Control Dashboard</h1>
       <p>
-        Upload CSV from <code>v_apl_walkback_sms_dashboard.sql</code> output. The dashboard computes
-        weighted KPI rates and lift by filter selections.
+        Load live data from <code>ffam-data-platform-loan-ops.report_views.v_apl_walkback_sms</code>
+        (OAuth + BigQuery) or upload CSV from <code>v_apl_walkback_sms_dashboard.sql</code>.
       </p>
     </div>
 
@@ -193,11 +194,23 @@
         <input type="file" id="csvFile" accept=".csv" />
       </div>
       <div class="control">
-        <label>Start Date</label>
+        <label>BigQuery Project ID</label>
+        <input type="text" id="bqProjectId" placeholder="your-gcp-project-id" />
+      </div>
+      <div class="control">
+        <label>OAuth Client ID</label>
+        <input type="text" id="oauthClientId" placeholder="xxxx.apps.googleusercontent.com" />
+      </div>
+      <div class="control">
+        <label>BigQuery Location</label>
+        <input type="text" id="bqLocation" value="US" />
+      </div>
+      <div class="control">
+        <label>Start Date (optional for live query)</label>
         <input type="date" id="startDate" />
       </div>
       <div class="control">
-        <label>End Date</label>
+        <label>End Date (optional for live query)</label>
         <input type="date" id="endDate" />
       </div>
       <div class="control">
@@ -222,6 +235,10 @@
       </div>
       <div class="control">
         <label>Actions</label>
+        <button id="loadFromViewBtn" type="button">Load from Provided View</button>
+      </div>
+      <div class="control">
+        <label>&nbsp;</label>
         <button id="loadDemoBtn" type="button">Load Demo Data</button>
       </div>
       <div class="control">
@@ -284,14 +301,23 @@
         </table>
       </div>
       <div id="status" class="status">
-        Expected CSV columns: day, utm_channel, utm_source, fico_band, loan_officer_name, delivery_group, parity_group,
+        Use "Load from Provided View" for live BigQuery data, or upload CSV with columns:
+        day, utm_channel, utm_source, fico_band, loan_officer_name, delivery_group, parity_group,
         fas_units, docs_collected_units, take_units, units_funded, dollars_funded.
       </div>
     </div>
   </div>
 
   <script>
-    const state = { data: [], filtered: [], charts: {} };
+    const state = {
+      data: [],
+      filtered: [],
+      charts: {},
+      tokenClient: null,
+      accessToken: "",
+      oauthClientId: "",
+      lastLoadSource: "demo"
+    };
 
     const REQUIRED_COLUMNS = [
       "day", "utm_channel", "utm_source", "fico_band", "loan_officer_name",
@@ -310,6 +336,10 @@
 2026-02-04,email,crm,680-719,Alex Smith,control,control_even,16,6,5,3,43000
 2026-02-05,paid_social,meta,640-679,Nina Patel,test,test_odd,14,5,4,3,41000
 2026-02-05,paid_social,meta,640-679,Nina Patel,control,control_even,15,4,3,2,26000`;
+
+    function setStatus(text) {
+      document.getElementById("status").textContent = text;
+    }
 
     function parseCsvLine(line) {
       const out = [];
@@ -336,7 +366,7 @@
     function parseCsv(csvText) {
       const lines = csvText.replace(/\r/g, "").split("\n").filter(Boolean);
       if (lines.length < 2) return [];
-      const headers = parseCsvLine(lines[0]).map(h => h.trim());
+      const headers = parseCsvLine(lines[0]).map((h) => h.trim());
       const rows = [];
       for (let i = 1; i < lines.length; i++) {
         const fields = parseCsvLine(lines[i]);
@@ -353,7 +383,7 @@
     }
 
     function normalizeRows(rows) {
-      return rows.map(r => ({
+      return rows.map((r) => ({
         day: r.day,
         utm_channel: r.utm_channel || "Unknown",
         utm_source: r.utm_source || "Unknown",
@@ -372,17 +402,17 @@
     function missingColumns(rows) {
       if (!rows.length) return REQUIRED_COLUMNS;
       const keys = Object.keys(rows[0]);
-      return REQUIRED_COLUMNS.filter(c => !keys.includes(c));
+      return REQUIRED_COLUMNS.filter((c) => !keys.includes(c));
     }
 
     function uniqueVals(data, key) {
-      return ["All", ...new Set(data.map(r => r[key]).filter(Boolean))];
+      return ["All", ...new Set(data.map((r) => r[key]).filter(Boolean))];
     }
 
     function fillSelect(id, values) {
       const el = document.getElementById(id);
       const current = el.value;
-      el.innerHTML = values.map(v => `<option value="${v}">${v}</option>`).join("");
+      el.innerHTML = values.map((v) => `<option value="${v}">${v}</option>`).join("");
       if (values.includes(current)) el.value = current;
     }
 
@@ -393,9 +423,15 @@
       fillSelect("loanOfficer", uniqueVals(data, "loan_officer_name"));
       fillSelect("parityGroup", uniqueVals(data, "parity_group"));
 
-      const dates = [...new Set(data.map(r => r.day).filter(Boolean))].sort();
-      document.getElementById("startDate").value = dates[0] || "";
-      document.getElementById("endDate").value = dates[dates.length - 1] || "";
+      const dates = [...new Set(data.map((r) => r.day).filter(Boolean))].sort();
+      if (dates.length) {
+        if (!document.getElementById("startDate").value) {
+          document.getElementById("startDate").value = dates[0];
+        }
+        if (!document.getElementById("endDate").value) {
+          document.getElementById("endDate").value = dates[dates.length - 1];
+        }
+      }
     }
 
     function filterData(data) {
@@ -407,7 +443,7 @@
       const lo = document.getElementById("loanOfficer").value;
       const parity = document.getElementById("parityGroup").value;
 
-      return data.filter(r => {
+      return data.filter((r) => {
         if (start && r.day < start) return false;
         if (end && r.day > end) return false;
         if (channel !== "All" && r.utm_channel !== channel) return false;
@@ -417,6 +453,10 @@
         if (parity !== "All" && r.parity_group !== parity) return false;
         return true;
       });
+    }
+
+    function blankAgg() {
+      return { fas: 0, docs: 0, take: 0, funded: 0, dollars: 0 };
     }
 
     function aggregateByGroup(rows) {
@@ -430,10 +470,6 @@
         out[grp].dollars += r.dollars_funded;
       }
       return out;
-    }
-
-    function blankAgg() {
-      return { fas: 0, docs: 0, take: 0, funded: 0, dollars: 0 };
     }
 
     function rate(num, den) {
@@ -458,7 +494,7 @@
 
     function setLiftText(elId, value) {
       const el = document.getElementById(elId);
-      const n = Number(value);
+      const n = Number(String(value).replace(/[^0-9.-]/g, ""));
       el.textContent = `${n >= 0 ? "+" : ""}${value}`;
       el.classList.remove("lift-positive", "lift-negative");
       el.classList.add(n >= 0 ? "lift-positive" : "lift-negative");
@@ -497,8 +533,8 @@
         o.docs += r.docs_collected_units;
       }
       const days = [...map.keys()].sort();
-      const test = days.map(d => rate(map.get(d).test.docs, map.get(d).test.fas));
-      const control = days.map(d => rate(map.get(d).control.docs, map.get(d).control.fas));
+      const test = days.map((d) => rate(map.get(d).test.docs, map.get(d).test.fas));
+      const control = days.map((d) => rate(map.get(d).control.docs, map.get(d).control.fas));
       return { days, test, control };
     }
 
@@ -514,13 +550,13 @@
       const labels = [...map.keys()].sort();
       return {
         labels,
-        test: labels.map(k => rate(map.get(k).test.docs, map.get(k).test.fas)),
-        control: labels.map(k => rate(map.get(k).control.docs, map.get(k).control.fas))
+        test: labels.map((k) => rate(map.get(k).test.docs, map.get(k).test.fas)),
+        control: labels.map((k) => rate(map.get(k).control.docs, map.get(k).control.fas))
       };
     }
 
     function destroyCharts() {
-      Object.values(state.charts).forEach(c => c && c.destroy());
+      Object.values(state.charts).forEach((c) => c && c.destroy());
       state.charts = {};
     }
 
@@ -539,7 +575,7 @@
         },
         options: {
           responsive: true,
-          scales: { y: { ticks: { callback: v => `${(v * 100).toFixed(0)}%` } } },
+          scales: { y: { ticks: { callback: (v) => `${(v * 100).toFixed(0)}%` } } },
           plugins: { legend: { labels: { color: "#e5e7eb" } } }
         }
       });
@@ -567,7 +603,7 @@
         },
         options: {
           indexAxis: "y",
-          scales: { x: { ticks: { callback: v => `${(v * 100).toFixed(0)}%` } } },
+          scales: { x: { ticks: { callback: (v) => `${(v * 100).toFixed(0)}%` } } },
           plugins: { legend: { labels: { color: "#e5e7eb" } } }
         }
       });
@@ -583,7 +619,7 @@
           ]
         },
         options: {
-          scales: { y: { ticks: { callback: v => `${(v * 100).toFixed(0)}%` } } },
+          scales: { y: { ticks: { callback: (v) => `${(v * 100).toFixed(0)}%` } } },
           plugins: { legend: { labels: { color: "#e5e7eb" } } }
         }
       });
@@ -599,7 +635,7 @@
           ]
         },
         options: {
-          scales: { y: { ticks: { callback: v => `${(v * 100).toFixed(0)}%` } } },
+          scales: { y: { ticks: { callback: (v) => `${(v * 100).toFixed(0)}%` } } },
           plugins: { legend: { labels: { color: "#e5e7eb" } } }
         }
       });
@@ -609,7 +645,9 @@
       const map = new Map();
       for (const r of rows) {
         const key = `${r.loan_officer_name}|${r.delivery_group}`;
-        if (!map.has(key)) map.set(key, { ...blankAgg(), loan_officer_name: r.loan_officer_name, delivery_group: r.delivery_group });
+        if (!map.has(key)) {
+          map.set(key, { ...blankAgg(), loan_officer_name: r.loan_officer_name, delivery_group: r.delivery_group });
+        }
         const o = map.get(key);
         o.fas += r.fas_units;
         o.docs += r.docs_collected_units;
@@ -617,11 +655,11 @@
         o.funded += r.units_funded;
         o.dollars += r.dollars_funded;
       }
-      const rowsAgg = [...map.values()].sort((a, b) =>
-        a.loan_officer_name.localeCompare(b.loan_officer_name) || a.delivery_group.localeCompare(b.delivery_group)
+      const rowsAgg = [...map.values()].sort(
+        (a, b) => a.loan_officer_name.localeCompare(b.loan_officer_name) || a.delivery_group.localeCompare(b.delivery_group)
       );
       const tbody = document.querySelector("#loTable tbody");
-      tbody.innerHTML = rowsAgg.map(r => `
+      tbody.innerHTML = rowsAgg.map((r) => `
         <tr>
           <td>${r.loan_officer_name}</td>
           <td>${r.delivery_group}</td>
@@ -639,34 +677,290 @@
       updateKpis(state.filtered);
       buildCharts(state.filtered);
       buildLoanOfficerTable(state.filtered);
-      document.getElementById("status").textContent =
-        `Loaded ${state.data.length.toLocaleString()} rows | Filtered ${state.filtered.length.toLocaleString()} rows`;
+      setStatus(
+        `Loaded ${state.data.length.toLocaleString()} rows from ${state.lastLoadSource} | ` +
+        `Filtered ${state.filtered.length.toLocaleString()} rows`
+      );
     }
 
-    function loadRows(rows) {
+    function loadRows(rows, sourceLabel) {
       const missing = missingColumns(rows);
       if (missing.length) {
-        document.getElementById("status").textContent =
-          `Missing required columns: ${missing.join(", ")}`;
+        setStatus(`Missing required columns: ${missing.join(", ")}`);
         return;
       }
       state.data = normalizeRows(rows);
+      state.lastLoadSource = sourceLabel;
       initFilters(state.data);
       render();
+    }
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function validDateText(v) {
+      return /^\d{4}-\d{2}-\d{2}$/.test(v);
+    }
+
+    function buildLiveQuery(startDate, endDate) {
+      const hasStart = validDateText(startDate);
+      const hasEnd = validDateText(endDate);
+      let dateFilter = `
+    fas_day >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH)
+    AND fas_day < DATE_TRUNC(CURRENT_DATE(), MONTH)`;
+      if (hasStart || hasEnd) {
+        const start = hasStart ? startDate : "1900-01-01";
+        const end = hasEnd ? endDate : "2999-12-31";
+        dateFilter = `
+    fas_day >= DATE('${start}')
+    AND fas_day <= DATE('${end}')`;
+      }
+
+      return `WITH source_data AS (
+  SELECT
+    application_id,
+    application_number,
+    full_app_submitted_datetime,
+    DATE(full_app_submitted_datetime) AS fas_day,
+    app_stage_name,
+    app_stage_status,
+    app_general_status,
+    app_history_start_datetime,
+    COALESCE(app_history_end_datetime, CURRENT_TIMESTAMP()) AS app_history_end_datetime,
+    state,
+    LOWER(COALESCE(utm_source, '')) AS utm_source,
+    COALESCE(utm_channel, 'Unknown') AS utm_channel,
+    COALESCE(fico_band, 'Unknown') AS fico_band,
+    COALESCE(loan_officer_name, 'Unassigned') AS loan_officer_name,
+    template_name,
+    sms_sent_datetime,
+    fullapp_docs_for_uw_received_datetime,
+    offer_accepted_datetime,
+    funded_datetime,
+    COALESCE(funded_amount, 0) AS funded_amount
+  FROM \`ffam-data-platform-loan-ops.report_views.v_apl_walkback_sms\`
+),
+eligible_apps AS (
+  SELECT DISTINCT
+    application_id
+  FROM source_data
+  WHERE app_stage_name = 'Full App Submitted'
+    AND app_stage_status = 'In Process'
+    AND LOWER(COALESCE(app_general_status, '')) = 'active'
+    AND TIMESTAMP_DIFF(app_history_end_datetime, app_history_start_datetime, HOUR) >= 24
+    AND state NOT IN ('IA', 'WA')
+    AND NOT REGEXP_CONTAINS(utm_source, r'(refi|ula|mptestutm|reload|achieve_bankrate_ahl)')
+),
+app_level AS (
+  SELECT
+    s.application_id,
+    ANY_VALUE(s.application_number) AS application_number,
+    ANY_VALUE(s.fas_day) AS fas_day,
+    ANY_VALUE(s.utm_channel) AS utm_channel,
+    ANY_VALUE(s.utm_source) AS utm_source,
+    ANY_VALUE(s.fico_band) AS fico_band,
+    ANY_VALUE(s.loan_officer_name) AS loan_officer_name,
+    MAX(CASE WHEN LOWER(COALESCE(s.template_name, '')) LIKE '%walkback%' THEN 1 ELSE 0 END) AS received_walkback_sms,
+    MAX(CASE WHEN s.fullapp_docs_for_uw_received_datetime IS NOT NULL THEN 1 ELSE 0 END) AS docs_collected_flag,
+    MAX(CASE WHEN s.offer_accepted_datetime IS NOT NULL THEN 1 ELSE 0 END) AS take_flag,
+    MAX(CASE WHEN s.funded_datetime IS NOT NULL THEN 1 ELSE 0 END) AS funded_flag,
+    MAX(CASE WHEN s.funded_datetime IS NOT NULL THEN s.funded_amount ELSE 0 END) AS funded_amount
+  FROM source_data s
+  INNER JOIN eligible_apps e
+    ON s.application_id = e.application_id
+  GROUP BY s.application_id
+),
+scored AS (
+  SELECT
+    *,
+    CASE
+      WHEN MOD(SAFE_CAST(REGEXP_EXTRACT(CAST(application_number AS STRING), r'(\\d+)$') AS INT64), 2) = 1
+        THEN 'test_odd'
+      ELSE 'control_even'
+    END AS parity_group,
+    CASE WHEN received_walkback_sms = 1 THEN 'test' ELSE 'control' END AS delivery_group
+  FROM app_level
+)
+SELECT
+  fas_day AS day,
+  utm_channel,
+  utm_source,
+  fico_band,
+  loan_officer_name,
+  delivery_group,
+  parity_group,
+  COUNT(DISTINCT application_id) AS fas_units,
+  COUNT(DISTINCT IF(docs_collected_flag = 1, application_id, NULL)) AS docs_collected_units,
+  COUNT(DISTINCT IF(take_flag = 1, application_id, NULL)) AS take_units,
+  COUNT(DISTINCT IF(funded_flag = 1, application_id, NULL)) AS units_funded,
+  SUM(IF(funded_flag = 1, funded_amount, 0)) AS dollars_funded
+FROM scored
+WHERE ${dateFilter}
+GROUP BY day, utm_channel, utm_source, fico_band, loan_officer_name, delivery_group, parity_group
+ORDER BY day, utm_channel, utm_source, fico_band, loan_officer_name, delivery_group, parity_group`;
+    }
+
+    function parseBqValue(fieldType, rawValue) {
+      if (rawValue === null || rawValue === undefined) return "";
+      const type = String(fieldType || "").toUpperCase();
+      if (["INTEGER", "INT64", "FLOAT", "FLOAT64", "NUMERIC", "BIGNUMERIC"].includes(type)) {
+        return toNumber(rawValue);
+      }
+      return rawValue;
+    }
+
+    function parseBqRows(rows, fields) {
+      if (!rows || !fields) return [];
+      return rows.map((row) => {
+        const out = {};
+        fields.forEach((field, idx) => {
+          out[field.name] = parseBqValue(field.type, row.f?.[idx]?.v);
+        });
+        return out;
+      });
+    }
+
+    async function bqFetch(url, token, bodyObj) {
+      const response = await fetch(url, {
+        method: bodyObj ? "POST" : "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: bodyObj ? JSON.stringify(bodyObj) : undefined
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error?.message || `BigQuery API error (${response.status})`);
+      }
+      return payload;
+    }
+
+    async function runBigQueryQuery(projectId, location, token, sql) {
+      const encodedProject = encodeURIComponent(projectId);
+      const firstUrl = `https://bigquery.googleapis.com/bigquery/v2/projects/${encodedProject}/queries`;
+      let payload = await bqFetch(firstUrl, token, {
+        query: sql,
+        useLegacySql: false,
+        location,
+        maxResults: 20000
+      });
+
+      const jobId = payload.jobReference?.jobId;
+      if (!jobId) {
+        throw new Error("Missing BigQuery job id in response.");
+      }
+
+      const queryUrl = (pageToken = "") => {
+        const params = new URLSearchParams({ location, maxResults: "20000" });
+        if (pageToken) params.set("pageToken", pageToken);
+        return `https://bigquery.googleapis.com/bigquery/v2/projects/${encodedProject}/queries/${encodeURIComponent(jobId)}?${params.toString()}`;
+      };
+
+      while (payload.jobComplete === false) {
+        await sleep(1000);
+        payload = await bqFetch(queryUrl(), token);
+      }
+
+      let fields = payload.schema?.fields || [];
+      let rows = parseBqRows(payload.rows || [], fields);
+      let pageToken = payload.pageToken;
+
+      while (pageToken) {
+        const next = await bqFetch(queryUrl(pageToken), token);
+        if (!fields.length && next.schema?.fields) fields = next.schema.fields;
+        rows = rows.concat(parseBqRows(next.rows || [], fields));
+        pageToken = next.pageToken;
+      }
+
+      return rows;
+    }
+
+    function saveBqConfig() {
+      localStorage.setItem("walkback_bq_project_id", document.getElementById("bqProjectId").value.trim());
+      localStorage.setItem("walkback_bq_client_id", document.getElementById("oauthClientId").value.trim());
+      localStorage.setItem("walkback_bq_location", document.getElementById("bqLocation").value.trim());
+    }
+
+    function restoreBqConfig() {
+      document.getElementById("bqProjectId").value = localStorage.getItem("walkback_bq_project_id") || "";
+      document.getElementById("oauthClientId").value = localStorage.getItem("walkback_bq_client_id") || "";
+      document.getElementById("bqLocation").value = localStorage.getItem("walkback_bq_location") || "US";
+    }
+
+    async function getAccessToken(clientId) {
+      if (!window.google || !google.accounts || !google.accounts.oauth2) {
+        throw new Error("Google Identity script not ready yet. Refresh and try again.");
+      }
+
+      if (!state.tokenClient || state.oauthClientId !== clientId) {
+        state.oauthClientId = clientId;
+        state.tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: "https://www.googleapis.com/auth/bigquery https://www.googleapis.com/auth/cloud-platform",
+          callback: () => {}
+        });
+      }
+
+      return new Promise((resolve, reject) => {
+        state.tokenClient.callback = (response) => {
+          if (response.error) {
+            reject(new Error(response.error_description || response.error));
+            return;
+          }
+          state.accessToken = response.access_token;
+          resolve(response.access_token);
+        };
+        state.tokenClient.requestAccessToken({ prompt: state.accessToken ? "" : "consent" });
+      });
+    }
+
+    async function loadFromProvidedView() {
+      const projectId = document.getElementById("bqProjectId").value.trim();
+      const clientId = document.getElementById("oauthClientId").value.trim();
+      const location = (document.getElementById("bqLocation").value.trim() || "US");
+      const start = document.getElementById("startDate").value;
+      const end = document.getElementById("endDate").value;
+
+      if (!projectId || !clientId) {
+        setStatus("Enter BigQuery Project ID and OAuth Client ID, then click Load from Provided View.");
+        return;
+      }
+
+      try {
+        saveBqConfig();
+        setStatus("Requesting Google OAuth token...");
+        const token = await getAccessToken(clientId);
+        const sql = buildLiveQuery(start, end);
+        setStatus("Running query on v_apl_walkback_sms...");
+        const rows = await runBigQueryQuery(projectId, location, token, sql);
+        if (!rows.length) {
+          setStatus("Query completed with 0 rows for current date window/filters.");
+          return;
+        }
+        loadRows(rows, "BigQuery view");
+      } catch (error) {
+        setStatus(`Live query failed: ${error.message}`);
+      }
     }
 
     document.getElementById("csvFile").addEventListener("change", (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = () => loadRows(parseCsv(String(reader.result)));
+      reader.onload = () => loadRows(parseCsv(String(reader.result)), "CSV upload");
       reader.readAsText(file);
+    });
+
+    document.getElementById("loadFromViewBtn").addEventListener("click", () => {
+      loadFromProvidedView();
     });
 
     document.getElementById("applyBtn").addEventListener("click", () => render());
 
     document.getElementById("resetBtn").addEventListener("click", () => {
-      ["utmChannel", "utmSource", "ficoBand", "loanOfficer", "parityGroup"].forEach(id => {
+      ["utmChannel", "utmSource", "ficoBand", "loanOfficer", "parityGroup"].forEach((id) => {
         document.getElementById(id).value = "All";
       });
       initFilters(state.data);
@@ -674,10 +968,11 @@
     });
 
     document.getElementById("loadDemoBtn").addEventListener("click", () => {
-      loadRows(parseCsv(demoCsv));
+      loadRows(parseCsv(demoCsv), "demo");
     });
 
-    loadRows(parseCsv(demoCsv));
+    restoreBqConfig();
+    loadRows(parseCsv(demoCsv), "demo");
   </script>
 </body>
 </html>
