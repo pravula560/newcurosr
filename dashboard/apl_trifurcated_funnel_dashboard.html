@@ -1,0 +1,939 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APL Trifurcated Funnel Dashboard</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --panel: rgba(255, 255, 255, 0.06);
+        --panel2: rgba(255, 255, 255, 0.08);
+        --text: rgba(255, 255, 255, 0.92);
+        --muted: rgba(255, 255, 255, 0.65);
+        --faint: rgba(255, 255, 255, 0.35);
+        --line: rgba(255, 255, 255, 0.12);
+        --good: #3ddc97;
+        --warn: #ffd166;
+        --bad: #ff5c7a;
+        --accent: #7c5cff;
+        --accent2: #32c6ff;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica,
+          Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: radial-gradient(1200px 700px at 15% -10%, rgba(124, 92, 255, 0.25), transparent 60%),
+          radial-gradient(1000px 600px at 75% 0%, rgba(50, 198, 255, 0.18), transparent 55%),
+          radial-gradient(1200px 700px at 80% 100%, rgba(61, 220, 151, 0.12), transparent 60%), var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+      }
+      a {
+        color: inherit;
+      }
+      header {
+        padding: 22px 22px 10px 22px;
+      }
+      .titleRow {
+        display: flex;
+        gap: 14px;
+        align-items: baseline;
+        flex-wrap: wrap;
+      }
+      h1 {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 750;
+        letter-spacing: 0.2px;
+      }
+      .subtitle {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .container {
+        padding: 0 22px 22px 22px;
+        display: grid;
+        grid-template-columns: 380px 1fr;
+        gap: 14px;
+        align-items: start;
+      }
+      @media (max-width: 1100px) {
+        .container {
+          grid-template-columns: 1fr;
+        }
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .panelHeader {
+        padding: 14px 14px 10px 14px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .panelHeader h2 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.88);
+      }
+      .panelBody {
+        padding: 14px;
+      }
+      .small {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      label {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      input[type="text"],
+      input[type="date"],
+      select {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        color: var(--text);
+        border-radius: 10px;
+        padding: 9px 10px;
+        outline: none;
+      }
+      input[type="file"] {
+        color: var(--muted);
+      }
+      .checkRow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 4px;
+        flex-wrap: wrap;
+      }
+      .checkRow label {
+        margin: 0;
+        color: var(--text);
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .btnRow {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      button {
+        cursor: pointer;
+        border-radius: 10px;
+        padding: 9px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(124, 92, 255, 0.22);
+        color: var(--text);
+        font-weight: 650;
+      }
+      button.secondary {
+        background: rgba(255, 255, 255, 0.06);
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      .status {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+        padding: 10px 12px;
+        border-top: 1px solid var(--line);
+        background: rgba(0, 0, 0, 0.22);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .status strong {
+        color: rgba(255, 255, 255, 0.86);
+        font-weight: 700;
+      }
+      .pill {
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(255, 255, 255, 0.84);
+      }
+      .mainGrid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+      }
+      .kpiGrid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+      @media (max-width: 1200px) {
+        .kpiGrid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      .kpi {
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .kpi .k {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .kpi .v {
+        font-family: var(--mono);
+        font-size: 18px;
+        color: rgba(255, 255, 255, 0.92);
+      }
+      .kpi .s {
+        margin-top: 6px;
+        font-size: 12px;
+        color: var(--faint);
+      }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .tab {
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.06);
+        padding: 7px 10px;
+        border-radius: 10px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.85);
+        cursor: pointer;
+      }
+      .tab.active {
+        background: rgba(124, 92, 255, 0.26);
+        border-color: rgba(124, 92, 255, 0.45);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        padding: 10px 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        text-align: left;
+        font-size: 12px;
+      }
+      th {
+        color: rgba(255, 255, 255, 0.78);
+        font-weight: 700;
+        background: rgba(255, 255, 255, 0.04);
+      }
+      tbody tr:hover td {
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .right {
+        text-align: right;
+      }
+      .mono {
+        font-family: var(--mono);
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .note {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 8px;
+      }
+      .warn {
+        color: var(--warn);
+      }
+      .ok {
+        color: var(--good);
+      }
+      .danger {
+        color: var(--bad);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="titleRow">
+        <h1>APL Trifurcated Funnel Dashboard</h1>
+        <div class="subtitle">
+          BigQuery extract → CSV → client-side filters (Core / Pagaya / Superprime)
+        </div>
+      </div>
+    </header>
+
+    <div class="container">
+      <section class="panel">
+        <div class="panelHeader">
+          <h2>Data & filters</h2>
+          <span class="pill" id="pillRows">0 rows</span>
+        </div>
+        <div class="panelBody">
+          <div class="field">
+            <label for="fileInput">Load extract CSV (output of scripts/run_apl_trifurcated_funnel.py)</label>
+            <input id="fileInput" type="file" accept=".csv,text/csv" />
+            <div class="small">
+              Tip: if you host this dashboard, set <span class="mono">?csv=path/to/file.csv</span> to auto-load.
+            </div>
+          </div>
+
+          <div style="height: 12px"></div>
+
+          <div class="grid2">
+            <div class="field">
+              <label for="productLineSel">Product line</label>
+              <select id="productLineSel">
+                <option value="ALL">All</option>
+                <option value="CORE">CORE</option>
+                <option value="PAGAYA">PAGAYA</option>
+                <option value="SUPERPRIME">SUPERPRIME</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="ficoBandSel">FICO band</label>
+              <select id="ficoBandSel">
+                <option value="ALL">All</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="height: 10px"></div>
+
+          <div class="grid2">
+            <div class="field">
+              <label for="createdStart">Created date (from)</label>
+              <input id="createdStart" type="date" />
+            </div>
+            <div class="field">
+              <label for="createdEnd">Created date (to)</label>
+              <input id="createdEnd" type="date" />
+            </div>
+          </div>
+
+          <div class="checkRow" style="margin-top: 10px">
+            <label><input id="eligibleOnly" type="checkbox" /> flag_eligible_lead only</label>
+            <label><input id="pagayaOnly" type="checkbox" /> Pagaya entry segmentation (view 2)</label>
+          </div>
+
+          <div class="btnRow">
+            <button id="btnApply" disabled>Apply</button>
+            <button id="btnReset" class="secondary" disabled>Reset</button>
+            <button id="btnDownloadFiltered" class="secondary" disabled>Download filtered CSV</button>
+          </div>
+
+          <div class="note">
+            <div><span class="mono">LOANS</span> = distinct <span class="mono">application_key</span></div>
+            <div><span class="mono">FUNDS</span> = distinct <span class="mono">loan_id</span> where <span class="mono">funding_datetime</span> not null</div>
+          </div>
+        </div>
+        <div class="status" id="status">
+          <div><strong>Status</strong>: <span id="statusText">No file loaded.</span></div>
+          <div class="mono" id="statusMeta"></div>
+        </div>
+      </section>
+
+      <section class="mainGrid">
+        <section class="panel">
+          <div class="panelHeader">
+            <h2>Summary</h2>
+            <div class="tabs" role="tablist" aria-label="Views">
+              <div class="tab active" id="tabView1" role="tab" tabindex="0">View 1: Product line funnel</div>
+              <div class="tab" id="tabView2" role="tab" tabindex="0">View 2: Pagaya entry segment</div>
+            </div>
+          </div>
+          <div class="panelBody">
+            <div class="kpiGrid" id="kpiGrid"></div>
+            <div style="height: 12px"></div>
+            <div id="tableWrap"></div>
+            <div class="note muted" id="footnote"></div>
+          </div>
+        </section>
+      </section>
+    </div>
+
+    <script>
+      const state = {
+        rawRows: [],
+        rows: [],
+        view: "VIEW1",
+        loadedFrom: "",
+        lastApplied: null,
+      };
+
+      const el = (id) => document.getElementById(id);
+      const fmtInt = (n) => (Number.isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—");
+      const fmtMoney = (n) =>
+        Number.isFinite(n)
+          ? n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })
+          : "—";
+      const toISODate = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
+
+      function parseBool(v) {
+        if (v === null || v === undefined) return null;
+        const s = String(v).trim().toLowerCase();
+        if (s === "") return null;
+        if (["1", "true", "t", "yes", "y"].includes(s)) return true;
+        if (["0", "false", "f", "no", "n"].includes(s)) return false;
+        return null;
+      }
+
+      function parseNum(v) {
+        if (v === null || v === undefined) return null;
+        const s = String(v).trim();
+        if (!s) return null;
+        const n = Number(s);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      function parseDateLike(v) {
+        if (!v) return null;
+        const s = String(v).trim();
+        if (!s) return null;
+        // BigQuery CSVs are often not strict ISO-8601. Normalize common cases:
+        // - "YYYY-MM-DD HH:MM:SS[.ffffff][ UTC]" -> ISO with Z
+        // - "YYYY-MM-DD" -> treat as UTC midnight
+        let norm = s;
+        norm = norm.replace(/ UTC$/i, "Z");
+        if (/^\d{4}-\d{2}-\d{2}$/.test(norm)) norm = norm + "T00:00:00Z";
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:/.test(norm)) norm = norm.replace(" ", "T");
+        if (/^\d{4}-\d{2}-\d{2}T/.test(norm) && !/(Z|[+-]\d{2}:?\d{2})$/i.test(norm)) norm = norm + "Z";
+        // Trim fractional seconds to milliseconds for broad browser compatibility.
+        norm = norm.replace(/(\.\d{3})\d+(Z|[+-]\d{2}:?\d{2})?$/i, "$1$2");
+        const d = new Date(norm);
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+
+      function parseCSV(text) {
+        const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+        if (!lines.length) return { headers: [], rows: [] };
+
+        // Simple CSV parser supporting quoted fields and commas/newlines inside quotes.
+        const rows = [];
+        let row = [];
+        let field = "";
+        let inQuotes = false;
+
+        function pushField() {
+          row.push(field);
+          field = "";
+        }
+        function pushRow() {
+          // skip empty trailing line
+          if (row.length === 1 && row[0] === "" && rows.length > 0) return;
+          rows.push(row);
+          row = [];
+        }
+
+        for (let i = 0; i < text.length; i++) {
+          const c = text[i];
+          const next = text[i + 1];
+          if (inQuotes) {
+            if (c === '"' && next === '"') {
+              field += '"';
+              i++;
+            } else if (c === '"') {
+              inQuotes = false;
+            } else {
+              field += c;
+            }
+          } else {
+            if (c === '"') {
+              inQuotes = true;
+            } else if (c === ",") {
+              pushField();
+            } else if (c === "\n") {
+              pushField();
+              pushRow();
+            } else if (c === "\r") {
+              // handled earlier
+            } else {
+              field += c;
+            }
+          }
+        }
+        pushField();
+        pushRow();
+
+        const headers = (rows.shift() || []).map((h) => String(h || "").trim());
+        const out = [];
+        for (const r of rows) {
+          if (r.length === 1 && String(r[0] || "").trim() === "") continue;
+          const obj = {};
+          for (let i = 0; i < headers.length; i++) obj[headers[i]] = r[i] ?? "";
+          out.push(obj);
+        }
+        return { headers, rows: out };
+      }
+
+      function normalizeRow(r) {
+        const created = parseDateLike(r.created_datetime);
+        const funding = parseDateLike(r.funding_datetime);
+        return {
+          application_key: r.application_key,
+          loan_id: r.loan_id,
+          product_line: String(r.product_line || "").trim().toUpperCase(),
+          created_datetime: created,
+          funding_datetime: funding,
+          flag_eligible_lead: parseBool(r.flag_eligible_lead),
+          fico_band: String(r.fico_band || "Unknown").trim() || "Unknown",
+          in_pq_cohort: parseNum(r.in_pq_cohort) === 1 ? 1 : 0,
+          in_fa_offers_cohort: parseNum(r.in_fa_offers_cohort) === 1 ? 1 : 0,
+          pagaya_entry_segment: String(r.pagaya_entry_segment || "").trim(),
+          full_app_submitted: parseNum(r.full_app_submitted) === 1 ? 1 : 0,
+          uw_decisioned: parseNum(r.uw_decisioned) === 1 ? 1 : 0,
+          uw_approved: parseNum(r.uw_approved) === 1 ? 1 : 0,
+          contract_signed: parseNum(r.contract_signed) === 1 ? 1 : 0,
+          funded: parseNum(r.funded) === 1 ? 1 : 0,
+          funded_volume: parseNum(r.funded_volume) ?? 0,
+          origination_dollars: parseNum(r.origination_dollars) ?? 0,
+        };
+      }
+
+      function setStatus(msg, meta = "") {
+        el("statusText").textContent = msg;
+        el("statusMeta").textContent = meta;
+      }
+
+      function setEnabled(enabled) {
+        el("btnApply").disabled = !enabled;
+        el("btnReset").disabled = !enabled;
+        el("btnDownloadFiltered").disabled = !enabled;
+      }
+
+      function uniqueSorted(arr) {
+        return Array.from(new Set(arr)).sort((a, b) => String(a).localeCompare(String(b)));
+      }
+
+      function initFicoBands(rows) {
+        const bands = uniqueSorted(rows.map((r) => r.fico_band || "Unknown"));
+        const sel = el("ficoBandSel");
+        sel.innerHTML = `<option value="ALL">All</option>` + bands.map((b) => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join("");
+      }
+
+      function initProductLines(rows) {
+        const lines = uniqueSorted(rows.map((r) => r.product_line || "").filter((x) => String(x).trim() !== ""));
+        const sel = el("productLineSel");
+        const prev = sel.value || "ALL";
+        sel.innerHTML =
+          `<option value="ALL">All</option>` + lines.map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
+        if (Array.from(sel.options).some((o) => o.value === prev)) sel.value = prev;
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function inferDateRange(rows) {
+        const created = rows.map((r) => r.created_datetime?.getTime()).filter((t) => Number.isFinite(t));
+        if (!created.length) return { min: null, max: null };
+        const min = new Date(Math.min(...created));
+        const max = new Date(Math.max(...created));
+        return { min, max };
+      }
+
+      function applyFilters() {
+        const productLine = el("productLineSel").value;
+        const ficoBand = el("ficoBandSel").value;
+        const start = el("createdStart").value ? new Date(el("createdStart").value + "T00:00:00Z") : null;
+        const end = el("createdEnd").value ? new Date(el("createdEnd").value + "T23:59:59Z") : null;
+        const eligibleOnly = el("eligibleOnly").checked;
+
+        const filtered = state.rawRows.filter((r) => {
+          if (productLine !== "ALL" && r.product_line !== productLine) return false;
+          if (ficoBand !== "ALL" && r.fico_band !== ficoBand) return false;
+          if (eligibleOnly && r.flag_eligible_lead !== true) return false;
+          if (start && r.created_datetime && r.created_datetime < start) return false;
+          if (end && r.created_datetime && r.created_datetime > end) return false;
+          if ((start || end) && !r.created_datetime) return false;
+          return true;
+        });
+
+        state.rows = filtered;
+        state.lastApplied = { productLine, ficoBand, start: el("createdStart").value, end: el("createdEnd").value, eligibleOnly };
+        el("pillRows").textContent = `${fmtInt(filtered.length)} rows`;
+        render();
+      }
+
+      function resetFilters() {
+        el("productLineSel").value = "ALL";
+        el("ficoBandSel").value = "ALL";
+        el("eligibleOnly").checked = false;
+        el("pagayaOnly").checked = false;
+        const { min, max } = inferDateRange(state.rawRows);
+        el("createdStart").value = min ? toISODate(min) : "";
+        el("createdEnd").value = max ? toISODate(max) : "";
+        applyFilters();
+      }
+
+      function stageCounts(rows) {
+        // Alignment rules from SQL header:
+        // LOANS  = distinct application_key by product_line
+        // FUNDS  = distinct loan_id where funding_datetime not null
+        const appKeys = new Set();
+        const fullApps = new Set();
+        const uwDecisioned = new Set();
+        const uwApproved = new Set();
+        const contracts = new Set();
+        const fundedLoanIds = new Set();
+        const fundedAmountsByLoanId = new Map();
+
+        for (const r of rows) {
+          if (r.application_key) appKeys.add(r.application_key);
+          if (r.full_app_submitted === 1 && r.application_key) fullApps.add(r.application_key);
+          if (r.uw_decisioned === 1 && r.application_key) uwDecisioned.add(r.application_key);
+          if (r.uw_approved === 1 && r.application_key) uwApproved.add(r.application_key);
+          if (r.contract_signed === 1 && r.application_key) contracts.add(r.application_key);
+          if (r.funding_datetime && r.loan_id) {
+            fundedLoanIds.add(r.loan_id);
+            const prev = fundedAmountsByLoanId.get(r.loan_id) || { funded_volume: 0, origination_dollars: 0 };
+            fundedAmountsByLoanId.set(r.loan_id, {
+              funded_volume: Math.max(prev.funded_volume, r.funded_volume || 0),
+              origination_dollars: Math.max(prev.origination_dollars, r.origination_dollars || 0),
+            });
+          }
+        }
+
+        let fundedVol = 0;
+        let origDollars = 0;
+        for (const v of fundedAmountsByLoanId.values()) {
+          fundedVol += v.funded_volume || 0;
+          origDollars += v.origination_dollars || 0;
+        }
+
+        return {
+          loans: appKeys.size,
+          full_apps: fullApps.size,
+          uw_decisioned: uwDecisioned.size,
+          uw_approved: uwApproved.size,
+          contract_signed: contracts.size,
+          funds: fundedLoanIds.size,
+          funded_volume: fundedVol,
+          origination_dollars: origDollars,
+        };
+      }
+
+      function rate(n, d) {
+        if (!d) return null;
+        return n / d;
+      }
+
+      function fmtPct(x) {
+        if (!Number.isFinite(x)) return "—";
+        return (x * 100).toFixed(1) + "%";
+      }
+
+      function renderKpis(agg) {
+        const kpis = [
+          { k: "LOANS (distinct application_key)", v: fmtInt(agg.loans), s: null },
+          { k: "Full app submitted", v: fmtInt(agg.full_apps), s: `rate vs LOANS: ${fmtPct(rate(agg.full_apps, agg.loans))}` },
+          { k: "UW approved", v: fmtInt(agg.uw_approved), s: `rate vs LOANS: ${fmtPct(rate(agg.uw_approved, agg.loans))}` },
+          { k: "FUNDS (distinct loan_id)", v: fmtInt(agg.funds), s: `rate vs LOANS: ${fmtPct(rate(agg.funds, agg.loans))}` },
+          { k: "Funded volume", v: fmtMoney(agg.funded_volume), s: "sum of funded_volume (deduped by loan_id)" },
+          { k: "Origination $", v: fmtMoney(agg.origination_dollars), s: "sum of origination_dollars (deduped by loan_id)" },
+        ];
+        el("kpiGrid").innerHTML = kpis
+          .map(
+            (x) => `
+            <div class="kpi">
+              <div class="k">${escapeHtml(x.k)}</div>
+              <div class="v">${escapeHtml(x.v)}</div>
+              <div class="s">${escapeHtml(x.s || "")}</div>
+            </div>
+          `,
+          )
+          .join("");
+      }
+
+      function groupBy(rows, keyFn) {
+        const m = new Map();
+        for (const r of rows) {
+          const k = keyFn(r);
+          if (!m.has(k)) m.set(k, []);
+          m.get(k).push(r);
+        }
+        return m;
+      }
+
+      function renderTableView1(rows) {
+        const groups = groupBy(rows, (r) => r.product_line || "UNKNOWN");
+        const keys = uniqueSorted(Array.from(groups.keys()));
+        const data = keys.map((k) => ({ k, agg: stageCounts(groups.get(k)) }));
+
+        const total = stageCounts(rows);
+        renderKpis(total);
+
+        const header = `
+          <table>
+            <thead>
+              <tr>
+                <th>product_line</th>
+                <th class="right mono">LOANS</th>
+                <th class="right mono">Full app</th>
+                <th class="right mono">UW decisioned</th>
+                <th class="right mono">UW approved</th>
+                <th class="right mono">Contract signed</th>
+                <th class="right mono">FUNDS</th>
+                <th class="right mono">Funded volume</th>
+                <th class="right mono">Origination $</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+        const rowsHtml = data
+          .map((d) => {
+            const a = d.agg;
+            return `
+              <tr>
+                <td class="mono">${escapeHtml(d.k)}</td>
+                <td class="right mono">${fmtInt(a.loans)}</td>
+                <td class="right mono">${fmtInt(a.full_apps)} <span class="muted">(${fmtPct(rate(a.full_apps, a.loans))})</span></td>
+                <td class="right mono">${fmtInt(a.uw_decisioned)} <span class="muted">(${fmtPct(rate(a.uw_decisioned, a.loans))})</span></td>
+                <td class="right mono">${fmtInt(a.uw_approved)} <span class="muted">(${fmtPct(rate(a.uw_approved, a.loans))})</span></td>
+                <td class="right mono">${fmtInt(a.contract_signed)} <span class="muted">(${fmtPct(rate(a.contract_signed, a.loans))})</span></td>
+                <td class="right mono">${fmtInt(a.funds)} <span class="muted">(${fmtPct(rate(a.funds, a.loans))})</span></td>
+                <td class="right mono">${fmtMoney(a.funded_volume)}</td>
+                <td class="right mono">${fmtMoney(a.origination_dollars)}</td>
+              </tr>
+            `;
+          })
+          .join("");
+        const footer = `
+            </tbody>
+          </table>
+        `;
+        el("tableWrap").innerHTML = header + rowsHtml + footer;
+        el("footnote").textContent =
+          "View 1 groups by product_line. LOANS are distinct application_key; FUNDS are distinct loan_id where funding_datetime is not null. $ columns are deduped by loan_id.";
+      }
+
+      function renderTableView2(rows) {
+        const onlySeg = el("pagayaOnly").checked;
+        const pagayaRows = rows.filter((r) => (r.product_line || "") === "PAGAYA");
+        const base = onlySeg ? pagayaRows : rows;
+        const groups = groupBy(base, (r) => r.pagaya_entry_segment || "(blank)");
+        const keys = uniqueSorted(Array.from(groups.keys()));
+        const data = keys.map((k) => ({ k, agg: stageCounts(groups.get(k)) }));
+
+        const total = stageCounts(base);
+        renderKpis(total);
+
+        const header = `
+          <table>
+            <thead>
+              <tr>
+                <th>pagaya_entry_segment</th>
+                <th class="right mono">LOANS</th>
+                <th class="right mono">Full app</th>
+                <th class="right mono">UW approved</th>
+                <th class="right mono">FUNDS</th>
+                <th class="right mono">Funded volume</th>
+                <th class="right mono">Origination $</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+        const rowsHtml = data
+          .map((d) => {
+            const a = d.agg;
+            return `
+              <tr>
+                <td class="mono">${escapeHtml(d.k)}</td>
+                <td class="right mono">${fmtInt(a.loans)}</td>
+                <td class="right mono">${fmtInt(a.full_apps)} <span class="muted">(${fmtPct(rate(a.full_apps, a.loans))})</span></td>
+                <td class="right mono">${fmtInt(a.uw_approved)} <span class="muted">(${fmtPct(rate(a.uw_approved, a.loans))})</span></td>
+                <td class="right mono">${fmtInt(a.funds)} <span class="muted">(${fmtPct(rate(a.funds, a.loans))})</span></td>
+                <td class="right mono">${fmtMoney(a.funded_volume)}</td>
+                <td class="right mono">${fmtMoney(a.origination_dollars)}</td>
+              </tr>
+            `;
+          })
+          .join("");
+        const footer = `
+            </tbody>
+          </table>
+        `;
+        el("tableWrap").innerHTML = header + rowsHtml + footer;
+        el("footnote").textContent = onlySeg
+          ? "View 2 is restricted to product_line = PAGAYA and groups by pagaya_entry_segment."
+          : "View 2 groups by pagaya_entry_segment across all product lines (non-PAGAYA rows may have blank segment).";
+      }
+
+      function render() {
+        if (!state.rows.length) {
+          el("kpiGrid").innerHTML = "";
+          el("tableWrap").innerHTML = `<div class="small muted">No rows match your filters.</div>`;
+          el("footnote").textContent = "";
+          return;
+        }
+        if (state.view === "VIEW1") renderTableView1(state.rows);
+        else renderTableView2(state.rows);
+      }
+
+      function toFilteredCsv(rows) {
+        const headers = [
+          "application_key",
+          "loan_id",
+          "product_line",
+          "created_datetime",
+          "funding_datetime",
+          "flag_eligible_lead",
+          "fico_band",
+          "in_pq_cohort",
+          "in_fa_offers_cohort",
+          "pagaya_entry_segment",
+          "full_app_submitted",
+          "uw_decisioned",
+          "uw_approved",
+          "contract_signed",
+          "funded",
+          "funded_volume",
+          "origination_dollars",
+        ];
+        const esc = (v) => {
+          const s = v === null || v === undefined ? "" : String(v);
+          if (/[",\n]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
+          return s;
+        };
+        const lines = [];
+        lines.push(headers.join(","));
+        for (const r of rows) {
+          lines.push(
+            headers
+              .map((h) => {
+                const v = r[h];
+                if (v instanceof Date) return esc(v.toISOString());
+                return esc(v);
+              })
+              .join(","),
+          );
+        }
+        return lines.join("\n");
+      }
+
+      function download(name, content, mime) {
+        const blob = new Blob([content], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      }
+
+      async function loadCsvFromUrl(url) {
+        setStatus("Loading CSV…", url);
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) throw new Error(`Failed to fetch CSV (${res.status})`);
+        const text = await res.text();
+        await loadCsvText(text, url);
+      }
+
+      async function loadCsvText(text, source) {
+        const parsed = parseCSV(text);
+        if (!parsed.headers.length) throw new Error("CSV has no headers");
+        const rows = parsed.rows.map(normalizeRow);
+        state.rawRows = rows;
+        state.rows = rows;
+        state.loadedFrom = source;
+        initProductLines(rows);
+        initFicoBands(rows);
+        const { min, max } = inferDateRange(rows);
+        if (!el("createdStart").value) el("createdStart").value = min ? toISODate(min) : "";
+        if (!el("createdEnd").value) el("createdEnd").value = max ? toISODate(max) : "";
+        el("pillRows").textContent = `${fmtInt(rows.length)} rows`;
+        setEnabled(true);
+        setStatus("Loaded.", `${fmtInt(rows.length)} rows`);
+        applyFilters();
+      }
+
+      function setView(view) {
+        state.view = view;
+        el("tabView1").classList.toggle("active", view === "VIEW1");
+        el("tabView2").classList.toggle("active", view === "VIEW2");
+        render();
+      }
+
+      el("fileInput").addEventListener("change", async (e) => {
+        const f = e.target.files?.[0];
+        if (!f) return;
+        try {
+          setStatus("Reading file…", f.name);
+          const text = await f.text();
+          await loadCsvText(text, f.name);
+        } catch (err) {
+          console.error(err);
+          setStatus("Error loading CSV.", String(err?.message || err));
+        }
+      });
+
+      el("btnApply").addEventListener("click", applyFilters);
+      el("btnReset").addEventListener("click", resetFilters);
+      el("btnDownloadFiltered").addEventListener("click", () => {
+        const csv = toFilteredCsv(state.rows);
+        const stamp = new Date().toISOString().slice(0, 19).replaceAll(":", "").replaceAll("-", "");
+        download(`apl_trifurcated_funnel_filtered_${stamp}.csv`, csv, "text/csv;charset=utf-8");
+      });
+
+      el("tabView1").addEventListener("click", () => setView("VIEW1"));
+      el("tabView2").addEventListener("click", () => setView("VIEW2"));
+
+      el("pagayaOnly").addEventListener("change", () => {
+        if (state.view === "VIEW2") render();
+      });
+
+      // Auto-load via ?csv=
+      (async function boot() {
+        try {
+          const params = new URLSearchParams(location.search);
+          const csvUrl = params.get("csv");
+          if (csvUrl) await loadCsvFromUrl(csvUrl);
+        } catch (err) {
+          console.error(err);
+          setStatus("Error loading CSV from URL.", String(err?.message || err));
+        }
+      })();
+    </script>
+  </body>
+</html>
+
