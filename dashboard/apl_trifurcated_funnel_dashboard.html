@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APL Trifurcated Funnel Dashboard</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --panel: rgba(255, 255, 255, 0.06);
+        --panel2: rgba(255, 255, 255, 0.09);
+        --text: rgba(255, 255, 255, 0.92);
+        --muted: rgba(255, 255, 255, 0.70);
+        --line: rgba(255, 255, 255, 0.14);
+        --accent: #7dd3fc;
+        --danger: #fb7185;
+        --ok: #34d399;
+        --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      }
+
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
+          "Segoe UI Emoji";
+        background: radial-gradient(1000px 600px at 20% 0%, rgba(125, 211, 252, 0.18), transparent 55%),
+          radial-gradient(800px 500px at 80% 10%, rgba(244, 114, 182, 0.14), transparent 52%),
+          radial-gradient(900px 600px at 50% 100%, rgba(52, 211, 153, 0.12), transparent 55%), var(--bg);
+        color: var(--text);
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .wrap {
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 28px 18px 44px;
+      }
+
+      header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .title {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .title h1 {
+        font-size: 20px;
+        letter-spacing: 0.2px;
+        margin: 0;
+      }
+      .title .sub {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.35;
+      }
+
+      .topbar {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+      }
+
+      .pill {
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text);
+        padding: 7px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .controls {
+        padding: 12px;
+        border-radius: 16px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.04));
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+      }
+
+      .controls-row {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 10px;
+        align-items: end;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .field label {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      select,
+      input[type="text"],
+      input[type="date"] {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 9px 10px;
+        color: var(--text);
+        outline: none;
+        font-size: 13px;
+      }
+
+      select:focus,
+      input[type="text"]:focus,
+      input[type="date"]:focus {
+        border-color: rgba(125, 211, 252, 0.6);
+        box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.15);
+      }
+
+      .checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        user-select: none;
+        padding: 10px 10px 9px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.05);
+        font-size: 13px;
+        color: var(--text);
+      }
+      .checkbox input {
+        accent-color: var(--accent);
+        width: 16px;
+        height: 16px;
+      }
+
+      .btn {
+        border: 1px solid rgba(125, 211, 252, 0.5);
+        background: rgba(125, 211, 252, 0.14);
+        color: var(--text);
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .btn:hover {
+        background: rgba(125, 211, 252, 0.2);
+      }
+
+      .btn.secondary {
+        border-color: var(--line);
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .btn.secondary:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+      .tab {
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+        padding: 8px 10px;
+        border-radius: 12px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .tab.active {
+        color: var(--text);
+        border-color: rgba(125, 211, 252, 0.55);
+        background: rgba(125, 211, 252, 0.11);
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 12px;
+      }
+      .card {
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 16px;
+        padding: 12px;
+        box-shadow: var(--shadow);
+      }
+      .card h3 {
+        margin: 0 0 6px;
+        font-size: 13px;
+        color: var(--muted);
+        letter-spacing: 0.2px;
+      }
+      .metric {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .metric .value {
+        font-size: 22px;
+        font-weight: 650;
+        letter-spacing: 0.2px;
+      }
+      .metric .hint {
+        font-size: 12px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 6px;
+      }
+      .table th,
+      .table td {
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 10px 8px;
+        font-size: 13px;
+        text-align: left;
+        vertical-align: middle;
+      }
+      .table th {
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .table td.num,
+      .table th.num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .table tr:hover td {
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .warn {
+        border: 1px solid rgba(251, 113, 133, 0.45);
+        background: rgba(251, 113, 133, 0.12);
+        border-radius: 14px;
+        padding: 10px 12px;
+        color: var(--text);
+        font-size: 13px;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .footer {
+        margin-top: 14px;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+
+      @media (max-width: 980px) {
+        header {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .topbar {
+          justify-content: flex-start;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <header>
+        <div class="title">
+          <h1>APL Trifurcated Funnel Dashboard</h1>
+          <div class="sub">
+            Loads the CSV extract generated from `sql/apl_trifurcated_funnel_query.sql` and computes funnel metrics
+            client-side. “Eligible-only” is a client-side filter by `flag_eligible_lead`.
+          </div>
+        </div>
+        <div class="topbar">
+          <div class="pill" id="dataPill">No data loaded</div>
+          <a class="pill" href="#" id="downloadFiltered">Download filtered CSV</a>
+        </div>
+      </header>
+
+      <div class="grid">
+        <div class="controls">
+          <div class="controls-row">
+            <div class="field" style="grid-column: span 4">
+              <label>CSV source</label>
+              <input id="csvUrl" type="text" placeholder="e.g. ./apl_trifurcated_funnel.csv (or https://...)" />
+            </div>
+            <div class="field" style="grid-column: span 2">
+              <label>Product line</label>
+              <select id="productLine"></select>
+            </div>
+            <div class="field" style="grid-column: span 2">
+              <label>FICO band</label>
+              <select id="ficoBand"></select>
+            </div>
+            <div class="field" style="grid-column: span 2">
+              <label>Cohort start</label>
+              <input id="startDate" type="date" />
+            </div>
+            <div class="field" style="grid-column: span 2">
+              <label>Cohort end</label>
+              <input id="endDate" type="date" />
+            </div>
+            <div class="field" style="grid-column: span 3">
+              <label>&nbsp;</label>
+              <label class="checkbox">
+                <input id="eligibleOnly" type="checkbox" />
+                Eligible-only (`flag_eligible_lead`)
+              </label>
+            </div>
+            <div class="field" style="grid-column: span 2">
+              <label>Pagaya entry segment</label>
+              <select id="pagayaEntry"></select>
+            </div>
+            <div class="field" style="grid-column: span 2">
+              <label>View</label>
+              <select id="viewMode">
+                <option value="overview">Overview (all)</option>
+                <option value="trifurcated">Trifurcated (Core / Pagaya)</option>
+                <option value="pagayaSegments">Pagaya segments (PQ/FA)</option>
+                <option value="cohorts">PQ vs FA cohorts</option>
+              </select>
+            </div>
+            <div class="field" style="grid-column: span 3">
+              <label>&nbsp;</label>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                <button class="btn" id="loadBtn">Load CSV</button>
+                <button class="btn secondary" id="resetBtn">Reset filters</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="tabs" id="quickTabs" style="display: none">
+            <button class="tab active" data-tab="all">All</button>
+            <button class="tab" data-tab="CORE">Core</button>
+            <button class="tab" data-tab="PAGAYA">Pagaya</button>
+            <button class="tab" data-tab="SUPERPRIME">Superprime</button>
+          </div>
+
+          <div id="warnBox" class="warn" style="display: none; margin-top: 10px"></div>
+          <div class="footer">
+            Notes: LOANS = COUNT(DISTINCT application_key) by product_line. FUNDS = COUNT(DISTINCT loan_id) where
+            `funding_datetime` is not null. Funded volume uses `funding_datetime` (not `funded_date`).
+          </div>
+        </div>
+
+        <div class="cards">
+          <div class="card" style="grid-column: span 3">
+            <h3>Loans</h3>
+            <div class="metric">
+              <div class="value" id="mLoans">—</div>
+              <div class="hint muted" id="mLoansHint">distinct applications</div>
+            </div>
+          </div>
+          <div class="card" style="grid-column: span 3">
+            <h3>Full app submitted</h3>
+            <div class="metric">
+              <div class="value" id="mFullApps">—</div>
+              <div class="hint" id="mFullAppsRate">—</div>
+            </div>
+          </div>
+          <div class="card" style="grid-column: span 3">
+            <h3>UW approved</h3>
+            <div class="metric">
+              <div class="value" id="mUwApproved">—</div>
+              <div class="hint" id="mUwApprovedRate">—</div>
+            </div>
+          </div>
+          <div class="card" style="grid-column: span 3">
+            <h3>Funds</h3>
+            <div class="metric">
+              <div class="value" id="mFunds">—</div>
+              <div class="hint" id="mFundsRate">—</div>
+            </div>
+          </div>
+
+          <div class="card" style="grid-column: span 6">
+            <h3>Funnel steps (counts + rates)</h3>
+            <table class="table" id="funnelTable"></table>
+          </div>
+          <div class="card" style="grid-column: span 6">
+            <h3>Breakdown</h3>
+            <div class="muted" style="font-size: 12px; margin-top: -2px">
+              Table varies by view selection.
+            </div>
+            <table class="table" id="breakdownTable"></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function $(id) {
+        return document.getElementById(id);
+      }
+
+      function fmtInt(n) {
+        if (n == null || Number.isNaN(n)) return "—";
+        return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(n);
+      }
+
+      function fmtPct(n) {
+        if (n == null || Number.isNaN(n)) return "—";
+        return new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 1 }).format(n);
+      }
+
+      function parseIsoDate(s) {
+        if (!s) return null;
+        const t = Date.parse(s);
+        if (Number.isNaN(t)) return null;
+        return new Date(t);
+      }
+
+      function toYmd(d) {
+        const pad = (x) => String(x).padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      }
+
+      function uniqueSorted(values) {
+        const set = new Set(values.filter((v) => v !== null && v !== undefined && String(v).trim() !== ""));
+        return Array.from(set).sort((a, b) => String(a).localeCompare(String(b)));
+      }
+
+      function safeNum(v) {
+        if (v === "" || v == null) return null;
+        const x = Number(v);
+        return Number.isFinite(x) ? x : null;
+      }
+
+      function parseCsv(text) {
+        // Simple RFC4180-ish parser (quoted fields, commas, newlines). Good enough for this extract.
+        const rows = [];
+        let row = [];
+        let cur = "";
+        let i = 0;
+        let inQuotes = false;
+        while (i < text.length) {
+          const c = text[i];
+          if (inQuotes) {
+            if (c === '"') {
+              if (text[i + 1] === '"') {
+                cur += '"';
+                i += 2;
+                continue;
+              }
+              inQuotes = false;
+              i += 1;
+              continue;
+            }
+            cur += c;
+            i += 1;
+            continue;
+          }
+          if (c === '"') {
+            inQuotes = true;
+            i += 1;
+            continue;
+          }
+          if (c === ",") {
+            row.push(cur);
+            cur = "";
+            i += 1;
+            continue;
+          }
+          if (c === "\r") {
+            i += 1;
+            continue;
+          }
+          if (c === "\n") {
+            row.push(cur);
+            rows.push(row);
+            row = [];
+            cur = "";
+            i += 1;
+            continue;
+          }
+          cur += c;
+          i += 1;
+        }
+        row.push(cur);
+        rows.push(row);
+        return rows;
+      }
+
+      function objectsFromCsv(text) {
+        const rows = parseCsv(text).filter((r) => r.length && r.some((x) => String(x).trim() !== ""));
+        if (!rows.length) return { headers: [], data: [] };
+        const headers = rows[0].map((h) => String(h).trim());
+        const data = [];
+        for (let ri = 1; ri < rows.length; ri++) {
+          const r = rows[ri];
+          const obj = {};
+          for (let ci = 0; ci < headers.length; ci++) obj[headers[ci]] = r[ci] ?? "";
+          data.push(obj);
+        }
+        return { headers, data };
+      }
+
+      function buildOptions(selectEl, values, { includeAll = true, allLabel = "All" } = {}) {
+        selectEl.innerHTML = "";
+        if (includeAll) {
+          const opt = document.createElement("option");
+          opt.value = "__ALL__";
+          opt.textContent = allLabel;
+          selectEl.appendChild(opt);
+        }
+        for (const v of values) {
+          const opt = document.createElement("option");
+          opt.value = v;
+          opt.textContent = v;
+          selectEl.appendChild(opt);
+        }
+      }
+
+      function groupBy(items, keyFn) {
+        const m = new Map();
+        for (const it of items) {
+          const k = keyFn(it);
+          if (!m.has(k)) m.set(k, []);
+          m.get(k).push(it);
+        }
+        return m;
+      }
+
+      function distinctCount(items, key) {
+        const s = new Set();
+        for (const it of items) {
+          const v = it[key];
+          if (v !== "" && v != null) s.add(v);
+        }
+        return s.size;
+      }
+
+      function sum(items, key) {
+        let tot = 0;
+        for (const it of items) {
+          const n = safeNum(it[key]);
+          if (n != null) tot += n;
+        }
+        return tot;
+      }
+
+      function anyDateRange(items) {
+        const dates = items
+          .map((r) => parseIsoDate(r.created_datetime))
+          .filter(Boolean)
+          .map((d) => d.getTime());
+        if (!dates.length) return null;
+        const min = new Date(Math.min(...dates));
+        const max = new Date(Math.max(...dates));
+        return { min, max };
+      }
+
+      function normalizeRow(r) {
+        // Keep as strings where possible; compute helper booleans.
+        const created = parseIsoDate(r.created_datetime);
+        return {
+          ...r,
+          product_line: (r.product_line ?? "").toString().trim().toUpperCase(),
+          fico_band: (r.fico_band ?? "").toString().trim(),
+          pagaya_entry_segment: (r.pagaya_entry_segment ?? "").toString().trim(),
+          created_datetime: r.created_datetime,
+          __created: created,
+          __eligible: String(r.flag_eligible_lead).toLowerCase() === "true" || String(r.flag_eligible_lead) === "1",
+          __in_pq: safeNum(r.in_pq_cohort) === 1,
+          __in_fa_offers: safeNum(r.in_fa_offers_cohort) === 1,
+          __full_app: safeNum(r.full_app_submitted) === 1,
+          __uw_decisioned: safeNum(r.uw_decisioned) === 1,
+          __uw_approved: safeNum(r.uw_approved) === 1,
+          __contract_signed: safeNum(r.contract_signed) === 1,
+          __funded: safeNum(r.funded) === 1 || (r.funding_datetime ?? "") !== "",
+        };
+      }
+
+      function applyFilters(allRows) {
+        const product = $("productLine").value;
+        const fico = $("ficoBand").value;
+        const eligibleOnly = $("eligibleOnly").checked;
+        const pagayaEntry = $("pagayaEntry").value;
+        const start = $("startDate").value ? new Date($("startDate").value + "T00:00:00Z") : null;
+        const end = $("endDate").value ? new Date($("endDate").value + "T23:59:59Z") : null;
+
+        return allRows.filter((r) => {
+          if (product !== "__ALL__" && r.product_line !== product) return false;
+          if (fico !== "__ALL__" && r.fico_band !== fico) return false;
+          if (eligibleOnly && !r.__eligible) return false;
+          if (pagayaEntry !== "__ALL__" && r.pagaya_entry_segment !== pagayaEntry) return false;
+          if (start && r.__created && r.__created < start) return false;
+          if (end && r.__created && r.__created > end) return false;
+          return true;
+        });
+      }
+
+      function calcFunnel(rows) {
+        const loans = distinctCount(rows, "application_key");
+        const fullApps = distinctCount(rows.filter((r) => r.__full_app), "application_key");
+        const uwDecisioned = distinctCount(rows.filter((r) => r.__uw_decisioned), "application_key");
+        const uwApproved = distinctCount(rows.filter((r) => r.__uw_approved), "application_key");
+        const contracts = distinctCount(rows.filter((r) => r.__contract_signed), "application_key");
+        const funds = distinctCount(rows.filter((r) => r.__funded), "loan_id");
+        const fundedVol = sum(rows.filter((r) => r.__funded), "funded_volume");
+        const origDollars = sum(rows.filter((r) => r.__funded), "origination_dollars");
+
+        const step = (label, n, denom) => ({
+          label,
+          count: n,
+          rate: denom > 0 ? n / denom : null,
+        });
+
+        const steps = [
+          step("Loans", loans, loans),
+          step("Full app submitted", fullApps, loans),
+          step("UW decisioned", uwDecisioned, loans),
+          step("UW approved", uwApproved, loans),
+          step("Contract signed", contracts, loans),
+          step("Funds", funds, loans),
+        ];
+
+        return { loans, fullApps, uwDecisioned, uwApproved, contracts, funds, fundedVol, origDollars, steps };
+      }
+
+      function renderFunnelTable(steps) {
+        const t = $("funnelTable");
+        t.innerHTML = "";
+        const thead = document.createElement("thead");
+        thead.innerHTML = `<tr><th>Step</th><th class="num">Count</th><th class="num">Rate</th></tr>`;
+        t.appendChild(thead);
+        const tbody = document.createElement("tbody");
+        for (const s of steps) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${s.label}</td><td class="num">${fmtInt(s.count)}</td><td class="num">${fmtPct(
+            s.rate
+          )}</td>`;
+          tbody.appendChild(tr);
+        }
+        t.appendChild(tbody);
+      }
+
+      function renderBreakdown(viewMode, rows) {
+        const t = $("breakdownTable");
+        t.innerHTML = "";
+
+        let groups = [];
+        if (viewMode === "overview") {
+          const m = groupBy(rows, (r) => r.product_line || "Unknown");
+          groups = Array.from(m.entries()).map(([k, items]) => ({ key: k, items }));
+        } else if (viewMode === "trifurcated") {
+          // Core vs Pagaya vs Superprime based on product_line (expected: CORE, PAGAYA, SUPERPRIME).
+          const m = groupBy(rows, (r) => r.product_line || "Unknown");
+          groups = Array.from(m.entries()).map(([k, items]) => ({ key: k, items }));
+        } else if (viewMode === "pagayaSegments") {
+          const onlyPagaya = rows.filter((r) => r.product_line === "PAGAYA");
+          const m = groupBy(onlyPagaya, (r) => r.pagaya_entry_segment || "Unknown");
+          groups = Array.from(m.entries()).map(([k, items]) => ({ key: k, items }));
+        } else if (viewMode === "cohorts") {
+          const onlyPagaya = rows.filter((r) => r.product_line === "PAGAYA");
+          const cohortLabel = (r) => {
+            const pq = r.__in_pq;
+            const fa = r.__in_fa_offers;
+            if (pq && fa) return "PQ + FA";
+            if (pq && !fa) return "PQ cohort";
+            if (!pq && fa) return "FA cohort";
+            return "Neither/Unknown";
+          };
+          const m = groupBy(onlyPagaya, cohortLabel);
+          groups = Array.from(m.entries()).map(([k, items]) => ({ key: k, items }));
+        }
+
+        groups.sort((a, b) => a.key.localeCompare(b.key));
+
+        const thead = document.createElement("thead");
+        thead.innerHTML =
+          "<tr><th>Group</th><th class='num'>Loans</th><th class='num'>Full app</th><th class='num'>UW appr</th><th class='num'>Funds</th><th class='num'>Fund rate</th><th class='num'>Funded $</th></tr>";
+        t.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+        for (const g of groups) {
+          const f = calcFunnel(g.items);
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${g.key}</td>
+            <td class="num">${fmtInt(f.loans)}</td>
+            <td class="num">${fmtInt(f.fullApps)}</td>
+            <td class="num">${fmtInt(f.uwApproved)}</td>
+            <td class="num">${fmtInt(f.funds)}</td>
+            <td class="num">${fmtPct(f.loans > 0 ? f.funds / f.loans : null)}</td>
+            <td class="num">${fmtInt(f.origDollars)}</td>`;
+          tbody.appendChild(tr);
+        }
+        t.appendChild(tbody);
+      }
+
+      function setWarn(msg) {
+        const box = $("warnBox");
+        if (!msg) {
+          box.style.display = "none";
+          box.textContent = "";
+          return;
+        }
+        box.style.display = "block";
+        box.textContent = msg;
+      }
+
+      function filteredToCsv(headers, rows) {
+        const esc = (v) => {
+          const s = (v ?? "").toString();
+          if (s.includes('"') || s.includes(",") || s.includes("\n") || s.includes("\r")) return `"${s.replaceAll('"', '""')}"`;
+          return s;
+        };
+        const lines = [];
+        lines.push(headers.map(esc).join(","));
+        for (const r of rows) lines.push(headers.map((h) => esc(r[h])).join(","));
+        return lines.join("\n");
+      }
+
+      let RAW_HEADERS = [];
+      let ALL_ROWS = [];
+      let FILTERED_ROWS = [];
+
+      function syncUiAfterLoad() {
+        const products = uniqueSorted(ALL_ROWS.map((r) => r.product_line).filter(Boolean));
+        const ficoBands = uniqueSorted(ALL_ROWS.map((r) => r.fico_band));
+        const pagayaEntries = uniqueSorted(ALL_ROWS.map((r) => r.pagaya_entry_segment));
+
+        buildOptions($("productLine"), products, { includeAll: true, allLabel: "All" });
+        buildOptions($("ficoBand"), ficoBands, { includeAll: true, allLabel: "All" });
+        buildOptions($("pagayaEntry"), pagayaEntries, { includeAll: true, allLabel: "All" });
+
+        const range = anyDateRange(ALL_ROWS);
+        if (range) {
+          $("startDate").value = toYmd(range.min);
+          $("endDate").value = toYmd(range.max);
+        }
+
+        $("quickTabs").style.display = "flex";
+      }
+
+      function render() {
+        if (!ALL_ROWS.length) return;
+        FILTERED_ROWS = applyFilters(ALL_ROWS);
+        const f = calcFunnel(FILTERED_ROWS);
+
+        $("mLoans").textContent = fmtInt(f.loans);
+        $("mFullApps").textContent = fmtInt(f.fullApps);
+        $("mFullAppsRate").textContent = fmtPct(f.loans > 0 ? f.fullApps / f.loans : null);
+        $("mUwApproved").textContent = fmtInt(f.uwApproved);
+        $("mUwApprovedRate").textContent = fmtPct(f.loans > 0 ? f.uwApproved / f.loans : null);
+        $("mFunds").textContent = fmtInt(f.funds);
+        $("mFundsRate").textContent = fmtPct(f.loans > 0 ? f.funds / f.loans : null);
+
+        renderFunnelTable(f.steps);
+        renderBreakdown($("viewMode").value, FILTERED_ROWS);
+
+        $("dataPill").textContent = `${fmtInt(FILTERED_ROWS.length)} rows (filtered) • ${fmtInt(ALL_ROWS.length)} total`;
+        setWarn(FILTERED_ROWS.length === 0 ? "No rows match the current filters." : "");
+      }
+
+      async function loadCsvFromUrl(url) {
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) throw new Error(`Failed to fetch CSV (${res.status})`);
+        const text = await res.text();
+        const { headers, data } = objectsFromCsv(text);
+        if (!headers.length) throw new Error("CSV appears empty or malformed.");
+        RAW_HEADERS = headers;
+        ALL_ROWS = data.map(normalizeRow);
+        syncUiAfterLoad();
+        render();
+      }
+
+      function resetFilters() {
+        $("productLine").value = "__ALL__";
+        $("ficoBand").value = "__ALL__";
+        $("pagayaEntry").value = "__ALL__";
+        $("eligibleOnly").checked = false;
+        const range = anyDateRange(ALL_ROWS);
+        if (range) {
+          $("startDate").value = toYmd(range.min);
+          $("endDate").value = toYmd(range.max);
+        }
+        $("viewMode").value = "overview";
+        render();
+      }
+
+      function boot() {
+        const params = new URLSearchParams(location.search);
+        const url = params.get("csv") || "./apl_trifurcated_funnel.csv";
+        $("csvUrl").value = url;
+
+        $("loadBtn").addEventListener("click", async () => {
+          setWarn("");
+          try {
+            await loadCsvFromUrl($("csvUrl").value.trim());
+          } catch (e) {
+            setWarn(e.message || String(e));
+          }
+        });
+
+        $("resetBtn").addEventListener("click", () => resetFilters());
+
+        for (const id of ["productLine", "ficoBand", "eligibleOnly", "pagayaEntry", "startDate", "endDate", "viewMode"]) {
+          $(id).addEventListener("change", () => render());
+        }
+
+        $("downloadFiltered").addEventListener("click", (e) => {
+          e.preventDefault();
+          if (!RAW_HEADERS.length || !FILTERED_ROWS.length) return;
+          const csv = filteredToCsv(RAW_HEADERS, FILTERED_ROWS);
+          const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "apl_trifurcated_funnel.filtered.csv";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        });
+
+        $("quickTabs").addEventListener("click", (e) => {
+          const btn = e.target.closest("button[data-tab]");
+          if (!btn) return;
+          for (const b of $("quickTabs").querySelectorAll(".tab")) b.classList.remove("active");
+          btn.classList.add("active");
+          const v = btn.getAttribute("data-tab");
+          if (v === "all") $("productLine").value = "__ALL__";
+          else $("productLine").value = v;
+          render();
+        });
+      }
+
+      boot();
+    </script>
+  </body>
+</html>
+
