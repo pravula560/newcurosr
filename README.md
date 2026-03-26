@@ -35,3 +35,22 @@ Optional:
 
 - Open `dashboard/apl_trifurcated_funnel_dashboard.html` in a browser.
 - Choose the exported CSV file when prompted (or drag/drop it onto the page).
+
+## Hosted dashboard (GitHub Pages)
+
+This repo includes a Pages-ready site under `docs/`.
+
+1) In GitHub: **Settings → Pages**
+2) **Build and deployment**:
+   - Source: **Deploy from a branch**
+   - Branch: `main` (or your branch), folder: `/docs`
+3) Save, wait for deployment.
+
+Then the hosted dashboard will be available at:
+
+- `https://pravula560.github.io/newcurosr/`
+
+The hosted page loads `docs/apl_trifurcated_funnel.sample.csv` by default. To load your own exported CSV, either:
+
+- Append `?csv=...` (URL-encoded) to the page URL, or
+- Paste a CSV URL into the “CSV source” field and click **Load CSV**.
