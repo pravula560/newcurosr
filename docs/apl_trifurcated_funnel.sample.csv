@@ -1,0 +1,6 @@
+application_key,loan_id,product_line,created_datetime,full_app_submitted_datetime,prequal_submitted_datetime,underwriter_decision_datetime,underwriter_decision,contract_docs_received_datetime,funded_date,funding_datetime,final_loan_amount,fico,Adjusted_fico_10t,flag_eligible_lead,in_pq_cohort,in_fa_offers_cohort,fico_band,full_app_submitted,uw_decisioned,uw_approved,contract_signed,funded,funded_volume,origination_dollars,pagaya_entry_segment
+app1,loan1,CORE,2026-01-05T12:00:00Z,2026-01-05T13:00:00Z,2026-01-05T12:30:00Z,2026-01-06T09:00:00Z,Approved,2026-01-06T10:00:00Z,2026-01-07,2026-01-07T15:00:00Z,12000,720,720,TRUE,0,0,FICO 700+,1,1,1,1,1,12000,12000,
+app2,loan2,CORE,2026-01-06T12:00:00Z,2026-01-06T13:00:00Z,2026-01-06T12:30:00Z,2026-01-07T09:00:00Z,Denied,,,"",8000,650,650,FALSE,0,0,FICO 640–699,1,1,0,0,0,0,0,
+app3,loan3,PAGAYA,2026-01-07T12:00:00Z,2026-01-07T13:00:00Z,2026-01-07T12:30:00Z,2026-01-08T09:00:00Z,Conditional Approval,2026-01-08T10:00:00Z,2026-01-09,2026-01-09T15:00:00Z,15000,680,680,TRUE,1,0,FICO 640–699,1,1,1,1,1,15000,15000,PQ entry
+app4,loan4,PAGAYA,2026-01-08T12:00:00Z,,,,,,,,,610,610,TRUE,0,1,FICO <640,0,0,0,0,0,0,0,FA entry
+app5,loan5,SUPERPRIME,2026-01-09T12:00:00Z,2026-01-09T13:00:00Z,,,,"","","",25000,730,730,TRUE,0,0,FICO 700+,1,0,0,0,0,0,0,
