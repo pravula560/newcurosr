@@ -1,0 +1,3 @@
+application_key,loan_id,product_line,created_datetime,flag_eligible_lead,fico_band,in_pq_cohort,in_fa_offers_cohort,pagaya_entry_segment,full_app_submitted,uw_decisioned,uw_approved,contract_signed,funded,origination_dollars
+SAMPLE_APP_001,SAMPLE_LOAN_001,CORE,2026-01-02 10:12:00,TRUE,FICO 700+,0,0,,1,1,1,1,1,12000
+SAMPLE_APP_002,,PAGAYA,2026-01-05 09:30:00,FALSE,FICO 640-699,1,0,PQ entry,0,0,0,0,0,0

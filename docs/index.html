@@ -241,9 +241,24 @@
         <div class="panel">
           <div class="panel-hd">
             <h2>Data & Filters</h2>
-            <span class="pill small">File stays local</span>
+            <span class="pill small">Auto-load enabled</span>
           </div>
           <div class="panel-bd">
+            <div style="margin-bottom: 12px;">
+              <label for="defaultDataUrl">Default data URL (auto-load on open)</label>
+              <input
+                id="defaultDataUrl"
+                type="text"
+                value="./data/latest.csv"
+                placeholder="./data/latest.csv or https://.../latest.csv"
+              />
+              <div class="help" style="margin-top:8px;">
+                On page load, the dashboard automatically tries:
+                <span style="font-family:var(--mono)">?data_url=...</span> from the URL,
+                then this default path.
+              </div>
+            </div>
+
             <div style="margin-bottom: 12px;">
               <label for="fileInput">Upload extract CSV</label>
               <input id="fileInput" type="file" accept=".csv,text/csv" />
@@ -255,6 +270,10 @@
                 <span style="font-family:var(--mono)">created_datetime</span>,
                 funnel flags, and <span style="font-family:var(--mono)">origination_dollars</span>.
               </div>
+            </div>
+
+            <div style="margin-top: 12px;">
+              <button id="reloadDataBtn" class="btn" type="button">Reload default/URL data</button>
             </div>
 
             <div id="errorBox" class="error" style="display:none;"></div>
@@ -488,6 +507,8 @@
 
       const els = {
         fileInput: document.getElementById("fileInput"),
+        defaultDataUrl: document.getElementById("defaultDataUrl"),
+        reloadDataBtn: document.getElementById("reloadDataBtn"),
         errorBox: document.getElementById("errorBox"),
         productLineSel: document.getElementById("productLineSel"),
         ficoSel: document.getElementById("ficoSel"),
@@ -648,6 +669,14 @@
         return await file.text();
       }
 
+      async function fetchCsvText(url) {
+        const resp = await fetch(url, { cache: "no-store" });
+        if (!resp.ok) {
+          throw new Error(`Could not fetch CSV from ${url} (HTTP ${resp.status})`);
+        }
+        return await resp.text();
+      }
+
       function validateColumns(header) {
         const missing = REQUIRED_COLUMNS.filter(c => !header.includes(c));
         if (missing.length) {
@@ -720,7 +749,45 @@
         setDefaultDates(rows);
       }
 
+      function loadRowsIntoState(rows) {
+        state.rows = rows;
+        state.filtered = rows;
+        state.hasActiveFilters = false;
+        initFilters(rows);
+        renderAll();
+      }
+
+      function resolveAutoDataUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const fromQuery = params.get("data_url");
+        if (fromQuery && fromQuery.trim()) return fromQuery.trim();
+        const fromInput = (els.defaultDataUrl?.value ?? "").trim();
+        if (fromInput) return fromInput;
+        return "./data/latest.csv";
+      }
+
+      async function loadDefaultDataOnOpen() {
+        const url = resolveAutoDataUrl();
+        try {
+          const text = await fetchCsvText(url);
+          const rows = loadCsv(text);
+          loadRowsIntoState(rows);
+          clearError();
+        } catch (err) {
+          // Keep page usable with manual upload fallback.
+          showError(
+            `Auto-load failed from ${url}.\nUpload CSV manually, or set ?data_url=<csv-url>.\n\n` +
+            (err?.message ? String(err.message) : String(err))
+          );
+        }
+      }
+
       els.applyBtn.addEventListener("click", applyFilters);
+
+      els.reloadDataBtn.addEventListener("click", async () => {
+        clearError();
+        await loadDefaultDataOnOpen();
+      });
 
       els.fileInput.addEventListener("change", async (e) => {
         const file = e.target.files?.[0];
@@ -729,15 +796,13 @@
         try {
           const text = await readFileAsText(file);
           const rows = loadCsv(text);
-          state.rows = rows;
-          state.filtered = rows;
-          state.hasActiveFilters = false;
-          initFilters(rows);
-          renderAll();
+          loadRowsIntoState(rows);
         } catch (err) {
           showError(err?.message ? String(err.message) : String(err));
         }
       });
+
+      loadDefaultDataOnOpen();
     </script>
   </body>
 </html>
