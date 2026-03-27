@@ -10,6 +10,26 @@ generate a fully-rendered SQL query for the APL trifurcated funnel dashboard.
 
 ## Usage
 
+## Dashboard (local)
+
+This repo also includes a small local dashboard that reads the extract output
+(exported from BigQuery) and computes funnel metrics client-side.
+
+1) Run the extract SQL in BigQuery and export results to a local file (CSV or Parquet).
+
+2) Start the dashboard:
+
+```bash
+python3 -m pip install --upgrade pip
+python3 -m pip install -r requirements.txt
+
+streamlit run dashboard_app.py -- \
+  --data /path/to/apl_trifurcated_funnel_extract.csv
+```
+
+The dashboard supports filters for product line, eligibility, FICO band, Pagaya entry segment,
+and a cohort date range (based on `created_datetime`).
+
 Generate SQL for all product lines from an open cohort start date:
 
 ```bash
