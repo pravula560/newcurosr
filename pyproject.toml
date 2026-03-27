@@ -1,0 +1,28 @@
+ [project]
+ name = "apl-trifurcated-funnel-dashboard"
+ version = "0.1.0"
+ description = "APL trifurcated funnel dashboard (Core / Pagaya / Superprime) backed by BigQuery extract."
+ readme = "README.md"
+ requires-python = ">=3.10"
+ dependencies = [
+   "streamlit",
+   "pandas",
+   "pyarrow",
+   "google-cloud-bigquery",
+   "google-auth",
+   "plotly",
+   "python-dateutil",
+ ]
+ 
+ [project.optional-dependencies]
+ dev = [
+   "ruff",
+ ]
+ 
+ [tool.ruff]
+ line-length = 100
+ target-version = "py310"
+ 
+ [tool.ruff.lint]
+ select = ["E", "F", "I", "B", "UP"]
+ ignore = []
