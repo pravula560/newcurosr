@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - cursor/apl-trifurcated-funnel-dashboard-d2ff
   workflow_dispatch: {}
 
 permissions:
