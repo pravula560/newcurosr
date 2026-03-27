@@ -41,10 +41,9 @@ To share externally:
 
 1. Push this branch to GitHub.
 2. In repository settings, enable GitHub Pages:
-   - Source: `Deploy from a branch`
-   - Branch: `cursor/apl-trifurcated-funnel-dashboard-d2ff`
-   - Folder: `/docs`
-3. Share the Pages URL:
+   - Source: `GitHub Actions`
+3. The included workflow (`.github/workflows/pages.yml`) will deploy `docs/` on push.
+4. Share the Pages URL:
    - `https://<org-or-user>.github.io/<repo>/`
 
 Generate SQL for all product lines from an open cohort start date:
