@@ -241,9 +241,24 @@
         <div class="panel">
           <div class="panel-hd">
             <h2>Data & Filters</h2>
-            <span class="pill small">File stays local</span>
+            <span class="pill small">Auto-load enabled</span>
           </div>
           <div class="panel-bd">
+            <div style="margin-bottom: 12px;">
+              <label for="defaultDataUrl">Default data URL (auto-load on open)</label>
+              <input
+                id="defaultDataUrl"
+                type="text"
+                value="./data/latest.csv"
+                placeholder="./data/latest.csv or https://.../latest.csv"
+              />
+              <div class="help" style="margin-top:8px;">
+                On page load, the dashboard automatically tries:
+                <span style="font-family:var(--mono)">?data_url=...</span> from the URL,
+                then this default path.
+              </div>
+            </div>
+
             <div style="margin-bottom: 12px;">
               <label for="fileInput">Upload extract CSV</label>
               <input id="fileInput" type="file" accept=".csv,text/csv" />
@@ -255,6 +270,10 @@
                 <span style="font-family:var(--mono)">created_datetime</span>,
                 funnel flags, and <span style="font-family:var(--mono)">origination_dollars</span>.
               </div>
+            </div>
+
+            <div style="margin-top: 12px;">
+              <button id="reloadDataBtn" class="btn" type="button">Reload default/URL data</button>
             </div>
 
             <div id="errorBox" class="error" style="display:none;"></div>
@@ -352,16 +371,20 @@
         "product_line",
         "created_datetime",
         "flag_eligible_lead",
-        "fico_band",
-        "in_pq_cohort",
-        "in_fa_offers_cohort",
-        "pagaya_entry_segment",
         "full_app_submitted",
         "uw_decisioned",
         "uw_approved",
         "contract_signed",
         "funded",
         "origination_dollars",
+      ];
+
+      const OPTIONAL_COLUMNS = [
+        "fico_band",
+        "in_pq_cohort",
+        "in_fa_offers_cohort",
+        "pagaya_entry_segment",
+        "full_app_submitted",
       ];
 
       const FUNNEL_STEPS = [
@@ -438,6 +461,13 @@
         return Array.from(new Set(arr));
       }
 
+      function normalizeColumnName(name) {
+        return String(name ?? "")
+          .trim()
+          .toLowerCase()
+          .replace(/[\s\-\/]+/g, "_");
+      }
+
       function fmtInt(n) {
         return (n ?? 0).toLocaleString("en-US");
       }
@@ -471,11 +501,14 @@
       const state = {
         rows: [],
         filtered: [],
+        hasActiveFilters: false,
         columns: [],
       };
 
       const els = {
         fileInput: document.getElementById("fileInput"),
+        defaultDataUrl: document.getElementById("defaultDataUrl"),
+        reloadDataBtn: document.getElementById("reloadDataBtn"),
         errorBox: document.getElementById("errorBox"),
         productLineSel: document.getElementById("productLineSel"),
         ficoSel: document.getElementById("ficoSel"),
@@ -611,11 +644,12 @@
           out.push(r);
         }
         state.filtered = out;
+        state.hasActiveFilters = true;
         renderAll();
       }
 
       function renderAll() {
-        const rows = state.filtered.length ? state.filtered : state.rows;
+        const rows = state.hasActiveFilters ? state.filtered : state.rows;
         const k = computeKpis(rows);
         els.kpiLoans.textContent = fmtInt(k.loans);
         els.kpiFunds.textContent = fmtInt(k.funds);
@@ -635,6 +669,14 @@
         return await file.text();
       }
 
+      async function fetchCsvText(url) {
+        const resp = await fetch(url, { cache: "no-store" });
+        if (!resp.ok) {
+          throw new Error(`Could not fetch CSV from ${url} (HTTP ${resp.status})`);
+        }
+        return await resp.text();
+      }
+
       function validateColumns(header) {
         const missing = REQUIRED_COLUMNS.filter(c => !header.includes(c));
         if (missing.length) {
@@ -645,35 +687,45 @@
       function loadCsv(text) {
         const lines = splitLines(text);
         if (!lines.length) throw new Error("CSV appears empty.");
-        const header = parseCsvLine(lines[0]).map(s => s.trim());
-        validateColumns(header);
+        const rawHeader = parseCsvLine(lines[0]).map(s => s.trim());
+        const normalizedToIndex = {};
+        for (let i = 0; i < rawHeader.length; i++) {
+          normalizedToIndex[normalizeColumnName(rawHeader[i])] = i;
+        }
 
-        const idx = {};
-        header.forEach((name, i) => { idx[name] = i; });
+        validateColumns(Object.keys(normalizedToIndex));
+
+        const getByName = (cols, name) => {
+          const i = normalizedToIndex[name];
+          return i === undefined ? "" : (cols[i] ?? "");
+        };
 
         const rows = [];
         for (let i = 1; i < lines.length; i++) {
           const cols = parseCsvLine(lines[i]);
-          // tolerate ragged rows
-          const get = (name) => cols[idx[name]] ?? "";
-
-          const created_date = toDateOnly(get("created_datetime"));
+          const created_date = toDateOnly(getByName(cols, "created_datetime"));
+          const ficoBand = getByName(cols, "fico_band");
+          const inPq = toInt(getByName(cols, "in_pq_cohort"));
+          const inFa = toInt(getByName(cols, "in_fa_offers_cohort"));
+          const pagayaSeg = getByName(cols, "pagaya_entry_segment");
           rows.push({
-            application_key: get("application_key"),
-            loan_id: get("loan_id"),
-            product_line: String(get("product_line") ?? "").trim().toUpperCase(),
+            application_key: getByName(cols, "application_key"),
+            loan_id: getByName(cols, "loan_id"),
+            product_line: String(getByName(cols, "product_line") ?? "").trim().toUpperCase(),
             created_date,
-            flag_eligible_lead: String(get("flag_eligible_lead")).toLowerCase() === "true" || get("flag_eligible_lead") === "1",
-            fico_band: get("fico_band"),
-            pagaya_entry_segment: get("pagaya_entry_segment") ?? "",
-            in_pq_cohort: toInt(get("in_pq_cohort")),
-            in_fa_offers_cohort: toInt(get("in_fa_offers_cohort")),
-            full_app_submitted: toInt(get("full_app_submitted")),
-            uw_decisioned: toInt(get("uw_decisioned")),
-            uw_approved: toInt(get("uw_approved")),
-            contract_signed: toInt(get("contract_signed")),
-            funded: toInt(get("funded")),
-            origination_dollars: toFloat(get("origination_dollars")),
+            flag_eligible_lead:
+              String(getByName(cols, "flag_eligible_lead")).toLowerCase() === "true" ||
+              getByName(cols, "flag_eligible_lead") === "1",
+            fico_band: ficoBand || "Unknown",
+            pagaya_entry_segment: pagayaSeg || ((inPq === 1 || inFa === 1) ? "Unknown" : ""),
+            in_pq_cohort: inPq,
+            in_fa_offers_cohort: inFa,
+            full_app_submitted: toInt(getByName(cols, "full_app_submitted")),
+            uw_decisioned: toInt(getByName(cols, "uw_decisioned")),
+            uw_approved: toInt(getByName(cols, "uw_approved")),
+            contract_signed: toInt(getByName(cols, "contract_signed")),
+            funded: toInt(getByName(cols, "funded")),
+            origination_dollars: toFloat(getByName(cols, "origination_dollars")),
           });
         }
         return rows;
@@ -697,7 +749,45 @@
         setDefaultDates(rows);
       }
 
+      function loadRowsIntoState(rows) {
+        state.rows = rows;
+        state.filtered = rows;
+        state.hasActiveFilters = false;
+        initFilters(rows);
+        renderAll();
+      }
+
+      function resolveAutoDataUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const fromQuery = params.get("data_url");
+        if (fromQuery && fromQuery.trim()) return fromQuery.trim();
+        const fromInput = (els.defaultDataUrl?.value ?? "").trim();
+        if (fromInput) return fromInput;
+        return "./data/latest.csv";
+      }
+
+      async function loadDefaultDataOnOpen() {
+        const url = resolveAutoDataUrl();
+        try {
+          const text = await fetchCsvText(url);
+          const rows = loadCsv(text);
+          loadRowsIntoState(rows);
+          clearError();
+        } catch (err) {
+          // Keep page usable with manual upload fallback.
+          showError(
+            `Auto-load failed from ${url}.\nUpload CSV manually, or set ?data_url=<csv-url>.\n\n` +
+            (err?.message ? String(err.message) : String(err))
+          );
+        }
+      }
+
       els.applyBtn.addEventListener("click", applyFilters);
+
+      els.reloadDataBtn.addEventListener("click", async () => {
+        clearError();
+        await loadDefaultDataOnOpen();
+      });
 
       els.fileInput.addEventListener("change", async (e) => {
         const file = e.target.files?.[0];
@@ -706,14 +796,13 @@
         try {
           const text = await readFileAsText(file);
           const rows = loadCsv(text);
-          state.rows = rows;
-          state.filtered = rows;
-          initFilters(rows);
-          renderAll();
+          loadRowsIntoState(rows);
         } catch (err) {
           showError(err?.message ? String(err.message) : String(err));
         }
       });
+
+      loadDefaultDataOnOpen();
     </script>
   </body>
 </html>
