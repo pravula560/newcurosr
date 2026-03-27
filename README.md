@@ -30,6 +30,23 @@ streamlit run dashboard_app.py -- \
 The dashboard supports filters for product line, eligibility, FICO band, Pagaya entry segment,
 and a cohort date range (based on `created_datetime`).
 
+## Shareable HTML dashboard (manager access)
+
+This repo includes a static dashboard at `docs/index.html` that runs fully in the browser.
+It does not require Python or Streamlit to view.
+
+Use it by uploading an extract CSV in the page (export from BigQuery).
+
+To share externally:
+
+1. Push this branch to GitHub.
+2. In repository settings, enable GitHub Pages:
+   - Source: `Deploy from a branch`
+   - Branch: `cursor/apl-trifurcated-funnel-dashboard-d2ff`
+   - Folder: `/docs`
+3. Share the Pages URL:
+   - `https://<org-or-user>.github.io/<repo>/`
+
 Generate SQL for all product lines from an open cohort start date:
 
 ```bash

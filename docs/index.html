@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APL Trifurcated Funnel Dashboard</title>
+    <style>
+      :root {
+        --bg: #0b1220;
+        --panel: #111a2e;
+        --muted: #8ea0c6;
+        --text: #e7eeff;
+        --border: rgba(255, 255, 255, 0.12);
+        --accent: #6ea8ff;
+        --accent2: #7ee7ff;
+        --danger: #ff6b6b;
+        --ok: #7CFFB2;
+        --warn: #ffd166;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+          "Courier New", monospace;
+        --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+          "Apple Color Emoji", "Segoe UI Emoji";
+      }
+      html, body {
+        margin: 0;
+        padding: 0;
+        font-family: var(--sans);
+        background: radial-gradient(1200px 700px at 20% 0%, rgba(110,168,255,0.16), transparent 55%),
+          radial-gradient(900px 600px at 90% 10%, rgba(126,231,255,0.12), transparent 50%),
+          var(--bg);
+        color: var(--text);
+      }
+      a { color: var(--accent2); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 22px 18px 36px;
+      }
+      .header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 14px;
+      }
+      .title h1 {
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: 0.2px;
+      }
+      .title p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        line-height: 1.4;
+        font-size: 13px;
+      }
+      .badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        justify-content: flex-end;
+      }
+      .badge {
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.03);
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 330px 1fr;
+        gap: 14px;
+      }
+      @media (max-width: 960px) {
+        .grid { grid-template-columns: 1fr; }
+      }
+      .panel {
+        background: rgba(17,26,46,0.78);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        box-shadow: 0 14px 36px rgba(0,0,0,0.35);
+        overflow: hidden;
+      }
+      .panel .panel-hd {
+        padding: 14px 14px 12px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .panel .panel-hd h2 {
+        margin: 0;
+        font-size: 13px;
+        letter-spacing: 0.5px;
+        color: #cfe1ff;
+        text-transform: uppercase;
+      }
+      .panel .panel-bd { padding: 14px; }
+      .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+      label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; }
+      input, select, button {
+        font: inherit;
+        color: var(--text);
+      }
+      input[type="file"], input[type="date"], input[type="text"], select {
+        width: 100%;
+        padding: 9px 10px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        outline: none;
+      }
+      input[type="checkbox"] { transform: translateY(1px); }
+      .help {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+      .error {
+        background: rgba(255,107,107,0.12);
+        border: 1px solid rgba(255,107,107,0.32);
+        color: #ffd6d6;
+        padding: 10px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 960px) {
+        .kpis { grid-template-columns: 1fr; }
+      }
+      .kpi {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px 12px;
+        background: rgba(255,255,255,0.03);
+      }
+      .kpi .k { font-size: 12px; color: var(--muted); }
+      .kpi .v { font-size: 20px; margin-top: 6px; font-family: var(--mono); }
+      .kpi .s { font-size: 12px; margin-top: 4px; color: var(--muted); }
+      .charts {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+        margin-top: 14px;
+      }
+      .chart {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px;
+        background: rgba(255,255,255,0.02);
+      }
+      .chart h3 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        color: #d5e6ff;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      th, td {
+        padding: 8px 8px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        color: #cfe1ff;
+        font-weight: 600;
+        font-size: 12px;
+      }
+      td.mono { font-family: var(--mono); }
+      .muted { color: var(--muted); }
+      .footer {
+        margin-top: 14px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.03);
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .pill strong { color: var(--text); font-weight: 600; }
+      .small { font-size: 11px; }
+      .btn {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(110,168,255,0.4);
+        background: linear-gradient(180deg, rgba(110,168,255,0.22), rgba(110,168,255,0.10));
+        cursor: pointer;
+      }
+      .btn:hover { border-color: rgba(126,231,255,0.55); }
+      .btn:active { transform: translateY(1px); }
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      @media (max-width: 960px) { .split { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="title">
+          <h1>APL Trifurcated Funnel Dashboard</h1>
+          <p>
+            Static HTML dashboard (no server). Upload a <span class="pill"><strong>CSV</strong></span>
+            export of the GBQ extract and explore funnel metrics client-side.
+            <span class="muted small">Core / Pagaya / Superprime.</span>
+          </p>
+        </div>
+        <div class="badges">
+          <div class="badge">LOANS = distinct <span style="font-family:var(--mono)">application_key</span></div>
+          <div class="badge">FUNDS = distinct <span style="font-family:var(--mono)">loan_id</span> where funded</div>
+          <div class="badge">Cohort = <span style="font-family:var(--mono)">created_datetime</span></div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="panel">
+          <div class="panel-hd">
+            <h2>Data & Filters</h2>
+            <span class="pill small">File stays local</span>
+          </div>
+          <div class="panel-bd">
+            <div style="margin-bottom: 12px;">
+              <label for="fileInput">Upload extract CSV</label>
+              <input id="fileInput" type="file" accept=".csv,text/csv" />
+              <div class="help" style="margin-top:8px;">
+                Export the GBQ query results to CSV. Required columns include
+                <span style="font-family:var(--mono)">application_key</span>,
+                <span style="font-family:var(--mono)">loan_id</span>,
+                <span style="font-family:var(--mono)">product_line</span>,
+                <span style="font-family:var(--mono)">created_datetime</span>,
+                funnel flags, and <span style="font-family:var(--mono)">origination_dollars</span>.
+              </div>
+            </div>
+
+            <div id="errorBox" class="error" style="display:none;"></div>
+
+            <div style="margin-top: 14px;">
+              <div class="split">
+                <div>
+                  <label for="productLineSel">Product line</label>
+                  <select id="productLineSel" multiple size="4"></select>
+                </div>
+                <div>
+                  <label for="ficoSel">FICO band</label>
+                  <select id="ficoSel" multiple size="4"></select>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top: 10px;">
+              <label for="pagayaSel">Pagaya entry segment</label>
+              <select id="pagayaSel" multiple size="4"></select>
+            </div>
+
+            <div style="margin-top: 10px;" class="row">
+              <label style="margin:0;display:flex;gap:8px;align-items:center;">
+                <input id="eligibleOnly" type="checkbox" />
+                flag_eligible_lead only
+              </label>
+            </div>
+
+            <div style="margin-top: 10px;" class="split">
+              <div>
+                <label for="startDate">Created start</label>
+                <input id="startDate" type="date" />
+              </div>
+              <div>
+                <label for="endDate">Created end</label>
+                <input id="endDate" type="date" />
+              </div>
+            </div>
+
+            <div style="margin-top: 12px;">
+              <button id="applyBtn" class="btn" type="button">Apply filters</button>
+            </div>
+
+            <div class="footer">
+              Tip: multi-select lists using Ctrl/Cmd-click.
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-hd">
+            <h2>Dashboard</h2>
+            <span id="rowsPill" class="pill small" style="display:none;"></span>
+          </div>
+          <div class="panel-bd">
+            <div class="kpis">
+              <div class="kpi">
+                <div class="k">LOANS</div>
+                <div class="v" id="kpiLoans">—</div>
+                <div class="s">Distinct application_key</div>
+              </div>
+              <div class="kpi">
+                <div class="k">FUNDS</div>
+                <div class="v" id="kpiFunds">—</div>
+                <div class="s">Distinct loan_id where funded</div>
+              </div>
+              <div class="kpi">
+                <div class="k">Origination Dollars</div>
+                <div class="v" id="kpiOrig">$—</div>
+                <div class="s">Sum origination_dollars where funded</div>
+              </div>
+            </div>
+
+            <div class="charts">
+              <div class="chart">
+                <h3>Funnel conversion</h3>
+                <div id="funnelTable"></div>
+              </div>
+
+              <div class="chart">
+                <h3>Product line breakdown</h3>
+                <div id="productTable"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const REQUIRED_COLUMNS = [
+        "application_key",
+        "loan_id",
+        "product_line",
+        "created_datetime",
+        "flag_eligible_lead",
+        "fico_band",
+        "in_pq_cohort",
+        "in_fa_offers_cohort",
+        "pagaya_entry_segment",
+        "full_app_submitted",
+        "uw_decisioned",
+        "uw_approved",
+        "contract_signed",
+        "funded",
+        "origination_dollars",
+      ];
+
+      const FUNNEL_STEPS = [
+        ["Applications", "application_key"],
+        ["Full App Submitted", "full_app_submitted"],
+        ["UW Decisioned", "uw_decisioned"],
+        ["UW Approved", "uw_approved"],
+        ["Contract Signed", "contract_signed"],
+        ["Funded", "funded"],
+      ];
+
+      /** Parse a single CSV line with quotes. */
+      function parseCsvLine(line) {
+        const out = [];
+        let cur = "";
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (inQuotes) {
+            if (ch === '"') {
+              if (i + 1 < line.length && line[i + 1] === '"') {
+                cur += '"';
+                i++;
+              } else {
+                inQuotes = false;
+              }
+            } else {
+              cur += ch;
+            }
+          } else {
+            if (ch === '"') inQuotes = true;
+            else if (ch === ",") {
+              out.push(cur);
+              cur = "";
+            } else {
+              cur += ch;
+            }
+          }
+        }
+        out.push(cur);
+        return out;
+      }
+
+      function splitLines(text) {
+        // Handles \n and \r\n
+        return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(l => l.length > 0);
+      }
+
+      function toInt(v) {
+        const n = Number(v);
+        return Number.isFinite(n) ? Math.trunc(n) : 0;
+      }
+
+      function toFloat(v) {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : 0;
+      }
+
+      function toDateOnly(value) {
+        // Accepts timestamps like "2026-01-02 03:04:05" or ISO strings.
+        if (!value) return null;
+        const s = String(value).trim();
+        const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (m) return m[1];
+        const d = new Date(s);
+        if (Number.isNaN(d.valueOf())) return null;
+        const yyyy = d.getUTCFullYear();
+        const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const dd = String(d.getUTCDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+      }
+
+      function uniq(arr) {
+        return Array.from(new Set(arr));
+      }
+
+      function fmtInt(n) {
+        return (n ?? 0).toLocaleString("en-US");
+      }
+
+      function fmtMoney(n) {
+        return "$" + (n ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
+      }
+
+      function fmtPct(x) {
+        const p = (x ?? 0) * 100;
+        return p.toFixed(2) + "%";
+      }
+
+      function renderTable(el, columns, rows) {
+        let html = "<table><thead><tr>";
+        for (const c of columns) html += `<th>${c}</th>`;
+        html += "</tr></thead><tbody>";
+        for (const r of rows) {
+          html += "<tr>";
+          for (const c of columns) {
+            const v = r[c];
+            const cls = (c.includes("Conversion") || c.includes("Dollars") || c.includes("Loans") || c.includes("Funds")) ? "mono" : "";
+            html += `<td class="${cls}">${v ?? ""}</td>`;
+          }
+          html += "</tr>";
+        }
+        html += "</tbody></table>";
+        el.innerHTML = html;
+      }
+
+      const state = {
+        rows: [],
+        filtered: [],
+        columns: [],
+      };
+
+      const els = {
+        fileInput: document.getElementById("fileInput"),
+        errorBox: document.getElementById("errorBox"),
+        productLineSel: document.getElementById("productLineSel"),
+        ficoSel: document.getElementById("ficoSel"),
+        pagayaSel: document.getElementById("pagayaSel"),
+        eligibleOnly: document.getElementById("eligibleOnly"),
+        startDate: document.getElementById("startDate"),
+        endDate: document.getElementById("endDate"),
+        applyBtn: document.getElementById("applyBtn"),
+        kpiLoans: document.getElementById("kpiLoans"),
+        kpiFunds: document.getElementById("kpiFunds"),
+        kpiOrig: document.getElementById("kpiOrig"),
+        funnelTable: document.getElementById("funnelTable"),
+        productTable: document.getElementById("productTable"),
+        rowsPill: document.getElementById("rowsPill"),
+      };
+
+      function showError(msg) {
+        els.errorBox.style.display = "block";
+        els.errorBox.textContent = msg;
+      }
+
+      function clearError() {
+        els.errorBox.style.display = "none";
+        els.errorBox.textContent = "";
+      }
+
+      function setOptions(selectEl, values) {
+        selectEl.innerHTML = "";
+        for (const v of values) {
+          const opt = document.createElement("option");
+          opt.value = v;
+          opt.textContent = v === "" ? "(empty)" : v;
+          opt.selected = true;
+          selectEl.appendChild(opt);
+        }
+      }
+
+      function getSelected(selectEl) {
+        const out = [];
+        for (const opt of selectEl.options) if (opt.selected) out.push(opt.value);
+        return out;
+      }
+
+      function computeKpis(rows) {
+        const appKeys = new Set();
+        const fundedLoanIds = new Set();
+        let orig = 0;
+        for (const r of rows) {
+          if (r.application_key) appKeys.add(r.application_key);
+          if (r.funded === 1) {
+            if (r.loan_id) fundedLoanIds.add(r.loan_id);
+            orig += r.origination_dollars;
+          }
+        }
+        return {
+          loans: appKeys.size,
+          funds: fundedLoanIds.size,
+          origination_dollars: orig,
+        };
+      }
+
+      function funnelCounts(rows) {
+        const baseApps = new Set(rows.map(r => r.application_key).filter(Boolean));
+        const baseCount = baseApps.size;
+        let prev = Math.max(baseCount, 1);
+        const out = [];
+        for (const [stepName, column] of FUNNEL_STEPS) {
+          let current = 0;
+          if (column === "application_key") {
+            current = baseCount;
+          } else {
+            const apps = new Set();
+            for (const r of rows) {
+              if (r[column] === 1 && r.application_key) apps.add(r.application_key);
+            }
+            current = apps.size;
+          }
+          out.push({
+            Step: stepName,
+            Applications: fmtInt(current),
+            "Step Conversion": fmtPct(current / prev),
+            "Overall Conversion": fmtPct(baseCount ? (current / baseCount) : 0),
+          });
+          prev = Math.max(current, 1);
+        }
+        return out;
+      }
+
+      function byProductLine(rows) {
+        const map = new Map(); // product_line -> {apps:Set, fundedLoanIds:Set, orig:number}
+        for (const r of rows) {
+          const key = (r.product_line ?? "").toString();
+          if (!map.has(key)) map.set(key, { apps: new Set(), fundedLoanIds: new Set(), orig: 0 });
+          const agg = map.get(key);
+          if (r.application_key) agg.apps.add(r.application_key);
+          if (r.funded === 1) {
+            if (r.loan_id) agg.fundedLoanIds.add(r.loan_id);
+            agg.orig += r.origination_dollars;
+          }
+        }
+        const out = [];
+        for (const [pl, agg] of map.entries()) {
+          out.push({
+            "Product line": pl,
+            Loans: fmtInt(agg.apps.size),
+            Funds: fmtInt(agg.fundedLoanIds.size),
+            "Origination Dollars": fmtMoney(agg.orig),
+          });
+        }
+        out.sort((a, b) => Number(b.Loans.replaceAll(",", "")) - Number(a.Loans.replaceAll(",", "")));
+        return out;
+      }
+
+      function applyFilters() {
+        if (!state.rows.length) return;
+        clearError();
+
+        const pl = new Set(getSelected(els.productLineSel));
+        const fico = new Set(getSelected(els.ficoSel));
+        const pagaya = new Set(getSelected(els.pagayaSel));
+        const eligibleOnly = els.eligibleOnly.checked;
+        const start = els.startDate.value || null;
+        const end = els.endDate.value || null;
+
+        const out = [];
+        for (const r of state.rows) {
+          if (pl.size && !pl.has(String(r.product_line ?? ""))) continue;
+          if (fico.size && !fico.has(String(r.fico_band ?? ""))) continue;
+          if (pagaya.size && !pagaya.has(String(r.pagaya_entry_segment ?? ""))) continue;
+          if (eligibleOnly && r.flag_eligible_lead !== true) continue;
+          if (start && r.created_date && r.created_date < start) continue;
+          if (end && r.created_date && r.created_date > end) continue;
+          out.push(r);
+        }
+        state.filtered = out;
+        renderAll();
+      }
+
+      function renderAll() {
+        const rows = state.filtered.length ? state.filtered : state.rows;
+        const k = computeKpis(rows);
+        els.kpiLoans.textContent = fmtInt(k.loans);
+        els.kpiFunds.textContent = fmtInt(k.funds);
+        els.kpiOrig.textContent = fmtMoney(k.origination_dollars);
+
+        els.rowsPill.style.display = "inline-flex";
+        els.rowsPill.textContent = `${fmtInt(rows.length)} rows shown`;
+
+        const funnel = funnelCounts(rows);
+        renderTable(els.funnelTable, ["Step", "Applications", "Step Conversion", "Overall Conversion"], funnel);
+
+        const prod = byProductLine(rows);
+        renderTable(els.productTable, ["Product line", "Loans", "Funds", "Origination Dollars"], prod);
+      }
+
+      async function readFileAsText(file) {
+        return await file.text();
+      }
+
+      function validateColumns(header) {
+        const missing = REQUIRED_COLUMNS.filter(c => !header.includes(c));
+        if (missing.length) {
+          throw new Error("Missing required columns:\n- " + missing.join("\n- "));
+        }
+      }
+
+      function loadCsv(text) {
+        const lines = splitLines(text);
+        if (!lines.length) throw new Error("CSV appears empty.");
+        const header = parseCsvLine(lines[0]).map(s => s.trim());
+        validateColumns(header);
+
+        const idx = {};
+        header.forEach((name, i) => { idx[name] = i; });
+
+        const rows = [];
+        for (let i = 1; i < lines.length; i++) {
+          const cols = parseCsvLine(lines[i]);
+          // tolerate ragged rows
+          const get = (name) => cols[idx[name]] ?? "";
+
+          const created_date = toDateOnly(get("created_datetime"));
+          rows.push({
+            application_key: get("application_key"),
+            loan_id: get("loan_id"),
+            product_line: String(get("product_line") ?? "").trim().toUpperCase(),
+            created_date,
+            flag_eligible_lead: String(get("flag_eligible_lead")).toLowerCase() === "true" || get("flag_eligible_lead") === "1",
+            fico_band: get("fico_band"),
+            pagaya_entry_segment: get("pagaya_entry_segment") ?? "",
+            in_pq_cohort: toInt(get("in_pq_cohort")),
+            in_fa_offers_cohort: toInt(get("in_fa_offers_cohort")),
+            full_app_submitted: toInt(get("full_app_submitted")),
+            uw_decisioned: toInt(get("uw_decisioned")),
+            uw_approved: toInt(get("uw_approved")),
+            contract_signed: toInt(get("contract_signed")),
+            funded: toInt(get("funded")),
+            origination_dollars: toFloat(get("origination_dollars")),
+          });
+        }
+        return rows;
+      }
+
+      function setDefaultDates(rows) {
+        const dates = rows.map(r => r.created_date).filter(Boolean).sort();
+        if (!dates.length) return;
+        els.startDate.value = dates[0];
+        els.endDate.value = dates[dates.length - 1];
+      }
+
+      function initFilters(rows) {
+        const productLines = uniq(rows.map(r => String(r.product_line ?? ""))).sort();
+        const ficoBands = uniq(rows.map(r => String(r.fico_band ?? ""))).sort();
+        const pagayaSegs = uniq(rows.map(r => String(r.pagaya_entry_segment ?? ""))).sort();
+
+        setOptions(els.productLineSel, productLines);
+        setOptions(els.ficoSel, ficoBands);
+        setOptions(els.pagayaSel, pagayaSegs);
+        setDefaultDates(rows);
+      }
+
+      els.applyBtn.addEventListener("click", applyFilters);
+
+      els.fileInput.addEventListener("change", async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        clearError();
+        try {
+          const text = await readFileAsText(file);
+          const rows = loadCsv(text);
+          state.rows = rows;
+          state.filtered = rows;
+          initFilters(rows);
+          renderAll();
+        } catch (err) {
+          showError(err?.message ? String(err.message) : String(err));
+        }
+      });
+    </script>
+  </body>
+</html>
