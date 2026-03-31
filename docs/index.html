@@ -188,6 +188,12 @@
         font-size: 12px;
         color: var(--muted);
       }
+      .status {
+        margin-top: 10px;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.45;
+      }
       .pill {
         display: inline-flex;
         align-items: center;
@@ -317,6 +323,8 @@
             <div style="margin-top: 12px;">
               <button id="applyBtn" class="btn" type="button">Apply filters</button>
             </div>
+
+            <div id="refreshStatus" class="status"></div>
 
             <div class="footer">
               Tip: multi-select lists using Ctrl/Cmd-click.
@@ -523,6 +531,7 @@
         funnelTable: document.getElementById("funnelTable"),
         productTable: document.getElementById("productTable"),
         rowsPill: document.getElementById("rowsPill"),
+        refreshStatus: document.getElementById("refreshStatus"),
       };
 
       function showError(msg) {
@@ -677,6 +686,25 @@
         return await resp.text();
       }
 
+      async function fetchMetadata(url) {
+        const resp = await fetch(url, { cache: "no-store" });
+        if (!resp.ok) {
+          throw new Error(`Could not fetch metadata from ${url} (HTTP ${resp.status})`);
+        }
+        return await resp.json();
+      }
+
+      function setRefreshStatus(meta) {
+        if (!meta || !els.refreshStatus) return;
+        const refreshed = meta.refreshed_at_utc ? String(meta.refreshed_at_utc) : "unknown";
+        const rows = Number.isFinite(Number(meta.row_count)) ? Number(meta.row_count).toLocaleString("en-US") : "unknown";
+        const eligible = meta.eligible_only ? "true" : "false";
+        const bounds = `${meta.cohort_start_date || "?"} to ${meta.cohort_end_date || "open"}`;
+        els.refreshStatus.innerHTML =
+          `<strong>Live data status:</strong> last refreshed ${refreshed}<br>` +
+          `Rows: ${rows} | Eligible-only extract: ${eligible} | Cohort: ${bounds}`;
+      }
+
       function validateColumns(header) {
         const missing = REQUIRED_COLUMNS.filter(c => !header.includes(c));
         if (missing.length) {
@@ -772,6 +800,15 @@
           const text = await fetchCsvText(url);
           const rows = loadCsv(text);
           loadRowsIntoState(rows);
+          const metadataUrl = url.replace(/\.csv(\?.*)?$/i, ".metadata.json$1");
+          try {
+            const meta = await fetchMetadata(metadataUrl);
+            setRefreshStatus(meta);
+          } catch (_err) {
+            if (els.refreshStatus) {
+              els.refreshStatus.textContent = "Live data status unavailable (metadata not found).";
+            }
+          }
           clearError();
         } catch (err) {
           // Keep page usable with manual upload fallback.

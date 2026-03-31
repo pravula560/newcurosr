@@ -46,6 +46,10 @@ To share externally:
 4. Share the Pages URL:
    - `https://<org-or-user>.github.io/<repo>/`
 
+The dashboard auto-loads `docs/data/latest.csv` and now also shows a **Live data status**
+chip sourced from `docs/data/latest.metadata.json` (last refresh timestamp, row count,
+and refresh settings).
+
 ## Automatic data refresh (with credentials)
 
 You can fully automate dashboard data refresh into `docs/data/latest.csv` using GitHub Actions.
@@ -78,7 +82,8 @@ It will:
 1. Render SQL from `sql/apl_trifurcated_funnel_dashboard_extract.sql`
 2. Execute query in BigQuery
 3. Write results to `docs/data/latest.csv`
-4. Commit and push to `main`
+4. Write refresh metadata to `docs/data/latest.metadata.json`
+5. Commit and push to `main`
 
 After push, GitHub Pages redeploys and your manager sees updated data automatically.
 

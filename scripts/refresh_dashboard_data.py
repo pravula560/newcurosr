@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import subprocess
 from pathlib import Path
 
@@ -76,8 +77,29 @@ def main() -> int:
     bq_cmd.append(sql_path.read_text(encoding="utf-8"))
     run(bq_cmd)
 
+    # Write a small metadata file so the static dashboard can show freshness.
+    row_count = 0
+    with destination.open("r", encoding="utf-8") as f:
+        # Subtract one for header when present.
+        row_count = max(sum(1 for _ in f) - 1, 0)
+
     stamp = dt.datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    metadata = {
+        "refreshed_at_utc": stamp,
+        "source_table": "ffam-data-platform.standardized_data.fplus_application",
+        "cohort_start_date": args.start_date,
+        "cohort_end_date": args.end_date or None,
+        "mtd": bool(args.mtd),
+        "as_of_date": args.as_of_date or None,
+        "eligible_only": bool(args.eligible_only),
+        "row_count": row_count,
+        "csv_path": str(destination),
+    }
+    metadata_path = destination.parent / "latest.metadata.json"
+    metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
     print(f"Updated {destination} at {stamp}")
+    print(f"Updated {metadata_path} with refresh metadata")
     return 0
 
 
