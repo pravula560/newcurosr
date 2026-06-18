@@ -171,10 +171,24 @@ bq query \
 
 Validate row counts and totals in the CSV before promoting.
 
-### Step 3 — Test locally
+### Step 3 — Test locally (Streamlit report)
 
-Open the CSV in Excel/Sheets, or load into your own notebook. This report is
-aggregated (not row-level applications), so it does not use `dashboard_app.py`.
+Start the local report app with sample data (no BigQuery required):
+
+```bash
+streamlit run daily_events_report_app.py -- \
+  --data data/sample_daily_events_channel_report.csv
+```
+
+After you export real data from BigQuery:
+
+```bash
+streamlit run daily_events_report_app.py -- \
+  --data /tmp/daily_events_channel_report.csv
+```
+
+The report includes funnel totals, daily trends, UTM channel and lead-type
+breakdowns, filterable detail rows, and CSV download.
 
 ### Step 4 — Move to dev (shared repo + Pages)
 

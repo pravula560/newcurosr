@@ -1,0 +1,13 @@
+event_date,utm_channel,lead_type,eligible_leads,lc_assigned_leads,contacts_made,full_app_submitted_leads,combined_full_app_approved_leads,contract_out_leads,contract_signed_leads,funded_leads,originated_loan_amount
+2026-05-01,Organic,Direct,120,95,80,45,32,28,24,18,540000
+2026-05-01,Paid Search,Affiliate,85,70,58,30,22,18,15,12,360000
+2026-05-01,Email,Direct,40,35,30,18,14,12,10,8,240000
+2026-05-02,Organic,Direct,115,90,75,42,30,26,22,17,510000
+2026-05-02,Paid Search,Affiliate,90,72,60,33,24,20,16,13,390000
+2026-05-02,Social,Direct,25,20,16,10,7,6,5,4,120000
+2026-05-03,Organic,Direct,130,100,82,48,35,30,26,20,600000
+2026-05-03,Paid Search,Affiliate,78,65,52,28,20,17,14,11,330000
+2026-05-03,Email,Direct,38,32,28,16,12,10,9,7,210000
+2026-05-04,Organic,Direct,125,98,79,44,31,27,23,19,570000
+2026-05-04,Paid Search,Affiliate,88,74,61,31,23,19,16,14,420000
+2026-05-04,Referral,Direct,15,12,10,6,5,4,4,3,90000
