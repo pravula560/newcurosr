@@ -124,3 +124,105 @@ python run_apl_trifurcated_funnel.py \
 
 By default the script writes SQL to `dist/apl_trifurcated_funnel_dashboard_extract.generated.sql`.
 Use `--stdout` to print to console.
+
+## Daily events channel report (local → dev)
+
+Aggregated daily funnel metrics by `event_date`, `utm_channel`, and `lead_type`
+from `fplus_application_daily_events_detail_max`.
+
+### Files
+
+- `sql/fplus_daily_events_channel_report.sql`: SQL template with date placeholders.
+- `run_fplus_daily_events_report.py`: CLI helper that injects date filters.
+- `scripts/refresh_daily_events_report.py`: Render + BigQuery + write CSV (needs `bq` CLI).
+
+### Step 1 — Render SQL locally
+
+```bash
+python run_fplus_daily_events_report.py \
+  --start-date 2026-05-01 \
+  --output dist/fplus_daily_events_channel_report.generated.sql
+```
+
+Optional end date or month-to-date:
+
+```bash
+python run_fplus_daily_events_report.py \
+  --start-date 2026-05-01 \
+  --end-date 2026-06-01
+
+python run_fplus_daily_events_report.py --mtd
+```
+
+### Step 2 — Run in BigQuery and export CSV
+
+BigQuery Console: paste `dist/fplus_daily_events_channel_report.generated.sql`, run, save as CSV.
+
+Or with authenticated `bq` CLI:
+
+```bash
+bq query \
+  --nouse_legacy_sql \
+  --format=csv \
+  --max_rows=10000000 \
+  --output_file=/tmp/daily_events_channel_report.csv \
+  "$(cat dist/fplus_daily_events_channel_report.generated.sql)"
+```
+
+Validate row counts and totals in the CSV before promoting.
+
+### Step 3 — Test locally (Streamlit report)
+
+Start the local report app with sample data (no BigQuery required):
+
+```bash
+streamlit run daily_events_report_app.py -- \
+  --data data/sample_daily_events_channel_report.csv
+```
+
+After you export real data from BigQuery:
+
+```bash
+streamlit run daily_events_report_app.py -- \
+  --data /tmp/daily_events_channel_report.csv
+```
+
+The report includes funnel totals, daily trends, UTM channel and lead-type
+breakdowns, filterable detail rows, and CSV download.
+
+### Step 4 — Move to dev (shared repo + Pages)
+
+1. Copy refreshed data into the static site folder:
+
+```bash
+cp /tmp/daily_events_channel_report.csv docs/data/daily_events_channel_report.csv
+```
+
+2. Commit SQL + data on a branch and open a PR to `main`:
+
+```bash
+git checkout -b cursor/fplus-daily-events-report-3146
+git add sql/fplus_daily_events_channel_report.sql \
+  run_fplus_daily_events_report.py \
+  scripts/refresh_daily_events_report.py \
+  docs/data/daily_events_channel_report.csv
+git commit -m "Add daily events channel report extract"
+git push -u origin cursor/fplus-daily-events-report-3146
+```
+
+3. Merge the PR. GitHub Pages redeploys `docs/` automatically.
+
+4. Share the CSV URL (after deploy):
+
+`https://<org-or-user>.github.io/<repo>/data/daily_events_channel_report.csv`
+
+### Step 5 — Automate refresh (optional)
+
+With `GCP_SA_KEY_JSON` and `BQ_PROJECT_ID` secrets already configured, run locally:
+
+```bash
+python scripts/refresh_daily_events_report.py --start-date 2026-05-01
+```
+
+Then commit and push `docs/data/daily_events_channel_report.csv` if you want
+that file updated on the shared site.
