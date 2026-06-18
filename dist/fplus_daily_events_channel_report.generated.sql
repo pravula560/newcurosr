@@ -2,8 +2,8 @@
 -- Source: fplus_application_daily_events_detail_max with employee-history join.
 --
 -- Placeholders (see run_fplus_daily_events_report.py):
---   2026-05-01     inclusive event_date lower bound (YYYY-MM-DD)
---      optional upper bound fragment
+--   EVENT_START placeholder — inclusive event_date lower bound
+--   EVENT_END_SQL placeholder — optional upper bound fragment
 SELECT
   fdm.event_date,
   fdm.utm_channel,
