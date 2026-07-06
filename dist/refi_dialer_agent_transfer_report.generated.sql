@@ -100,27 +100,27 @@ dialer_campaign_stats AS (
   )
   SELECT
     CASE
-      WHEN cs.campaign_start_date_time <= TIMESTAMP '2021-12-08 00:00:00 America/Phoenix'
-        THEN d.start_run_time
-      WHEN cs.campaign_start_date_time > TIMESTAMP '2021-12-08 00:00:00 America/Phoenix'
-        AND DATE_DIFF(
-          DATETIME(cs.campaign_end_date_time),
-          DATETIME(cs.campaign_start_date_time),
+      WHEN TIMESTAMP(cs.campaign_start_date_time, 'America/Phoenix') <= TIMESTAMP('2021-12-08', 'America/Phoenix')
+        THEN TIMESTAMP(d.start_run_time, 'America/Phoenix')
+      WHEN TIMESTAMP(cs.campaign_start_date_time, 'America/Phoenix') > TIMESTAMP('2021-12-08', 'America/Phoenix')
+        AND TIMESTAMP_DIFF(
+          TIMESTAMP(cs.campaign_end_date_time, 'America/Phoenix'),
+          TIMESTAMP(cs.campaign_start_date_time, 'America/Phoenix'),
           MINUTE
         ) >= 30
-        THEN cs.campaign_start_date_time
+        THEN TIMESTAMP(cs.campaign_start_date_time, 'America/Phoenix')
       ELSE NULL
     END AS start_run_time,
     CASE
-      WHEN cs.campaign_start_date_time <= TIMESTAMP '2021-12-08 00:00:00 America/Phoenix'
-        THEN d.end_run_time
-      WHEN cs.campaign_start_date_time > TIMESTAMP '2021-12-08 00:00:00 America/Phoenix'
-        AND DATE_DIFF(
-          DATETIME(cs.campaign_end_date_time),
-          DATETIME(cs.campaign_start_date_time),
+      WHEN TIMESTAMP(cs.campaign_start_date_time, 'America/Phoenix') <= TIMESTAMP('2021-12-08', 'America/Phoenix')
+        THEN TIMESTAMP(d.end_run_time, 'America/Phoenix')
+      WHEN TIMESTAMP(cs.campaign_start_date_time, 'America/Phoenix') > TIMESTAMP('2021-12-08', 'America/Phoenix')
+        AND TIMESTAMP_DIFF(
+          TIMESTAMP(cs.campaign_end_date_time, 'America/Phoenix'),
+          TIMESTAMP(cs.campaign_start_date_time, 'America/Phoenix'),
           MINUTE
         ) >= 30
-        THEN cs.campaign_end_date_time
+        THEN TIMESTAMP(cs.campaign_end_date_time, 'America/Phoenix')
       ELSE NULL
     END AS end_run_time,
     cs.campaign_name,
@@ -162,7 +162,7 @@ dialer_contacts AS (
   FROM dialer_campaign_stats d
   INNER JOIN `ffam-data-platform.standardized_data.inin_dialer_history` ch
     ON d.campaign_name = ch.campaign_name
-    AND ch.call_placed_datetime BETWEEN TIMESTAMP(d.start_run_time) AND TIMESTAMP(d.end_run_time)
+    AND ch.call_placed_datetime BETWEEN d.start_run_time AND d.end_run_time
   LEFT JOIN `ffam-data-platform.standardized_data.employee_history` e
     ON ch.agent_id = e.inin_username
     AND e.is_active_rec = 1
@@ -193,28 +193,28 @@ application_history_ranked AS (
     h.application_key,
     TRIM(h.loan_officer_assignment) AS loan_officer_assignment,
     COALESCE(
-      h.record_start_datetime,
-      h.modified_datetime,
-      h.created_datetime
+      TIMESTAMP(h.record_start_datetime, 'America/Phoenix'),
+      TIMESTAMP(h.modified_datetime, 'America/Phoenix'),
+      TIMESTAMP(h.created_datetime, 'America/Phoenix')
     ) AS history_effective_datetime,
     LAG(TRIM(h.loan_officer_assignment)) OVER (
       PARTITION BY h.application_key
       ORDER BY COALESCE(
-        h.record_start_datetime,
-        h.modified_datetime,
-        h.created_datetime
+        TIMESTAMP(h.record_start_datetime, 'America/Phoenix'),
+        TIMESTAMP(h.modified_datetime, 'America/Phoenix'),
+        TIMESTAMP(h.created_datetime, 'America/Phoenix')
       )
     ) AS prior_loan_officer_assignment,
     LEAD(COALESCE(
-      h.record_start_datetime,
-      h.modified_datetime,
-      h.created_datetime
+      TIMESTAMP(h.record_start_datetime, 'America/Phoenix'),
+      TIMESTAMP(h.modified_datetime, 'America/Phoenix'),
+      TIMESTAMP(h.created_datetime, 'America/Phoenix')
     )) OVER (
       PARTITION BY h.application_key
       ORDER BY COALESCE(
-        h.record_start_datetime,
-        h.modified_datetime,
-        h.created_datetime
+        TIMESTAMP(h.record_start_datetime, 'America/Phoenix'),
+        TIMESTAMP(h.modified_datetime, 'America/Phoenix'),
+        TIMESTAMP(h.created_datetime, 'America/Phoenix')
       )
     ) AS next_history_effective_datetime
   FROM `ffam-data-platform.standardized_data.fplus_application_history` h
