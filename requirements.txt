@@ -3,3 +3,4 @@ pandas
 pyarrow
 altair
 plotly
+google-cloud-bigquery

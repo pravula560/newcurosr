@@ -38,7 +38,7 @@ dialer_contacts AS (
   SELECT
     ch.source_system_id,
     ch.contacted,
-    ch.call_placed_datetime,
+    TIMESTAMP(ch.call_placed_datetime, 'America/Phoenix') AS call_placed_datetime,
     ch.campaign_name,
     ch.agent_id AS dialer_agent_id,
     e.full_name AS dialer_agent_name,
@@ -68,7 +68,7 @@ dialer_contacts AS (
   LEFT JOIN `ffam-data-platform.standardized_data.fplus_application` a15
     ON a.application_key IS NULL
     AND ch.source_system_id = SUBSTR(a15.application_key, 1, 15)
-  WHERE ch.call_placed_datetime >= TIMESTAMP('2026-01-01', 'America/Phoenix')
+  WHERE TIMESTAMP(ch.call_placed_datetime, 'America/Phoenix') >= TIMESTAMP('2026-01-01', 'America/Phoenix')
 
     AND COALESCE(a.application_key, a15.application_key) IS NOT NULL
     AND (
@@ -89,18 +89,10 @@ application_history_ranked AS (
   SELECT
     h.application_key,
     TRIM(h.loan_officer_assignment) AS loan_officer_assignment,
-    COALESCE(
-      TIMESTAMP(h.record_start_datetime, 'America/Phoenix'),
-      TIMESTAMP(h.modified_datetime, 'America/Phoenix'),
-      TIMESTAMP(h.created_datetime, 'America/Phoenix')
-    ) AS history_effective_datetime,
+    TIMESTAMP(COALESCE(h.record_start_datetime, h.modified_datetime, h.created_datetime), 'America/Phoenix') AS history_effective_datetime,
     LAG(TRIM(h.loan_officer_assignment)) OVER (
       PARTITION BY h.application_key
-      ORDER BY COALESCE(
-        TIMESTAMP(h.record_start_datetime, 'America/Phoenix'),
-        TIMESTAMP(h.modified_datetime, 'America/Phoenix'),
-        TIMESTAMP(h.created_datetime, 'America/Phoenix')
-      )
+      ORDER BY TIMESTAMP(COALESCE(h.record_start_datetime, h.modified_datetime, h.created_datetime), 'America/Phoenix')
     ) AS prior_loan_officer_assignment
   FROM `ffam-data-platform.standardized_data.fplus_application_history` h
   WHERE h.loan_officer_assignment IS NOT NULL

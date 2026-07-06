@@ -60,7 +60,8 @@ def render_template(template_path: Path, start_date: str, end_date: str | None, 
     end_sql = ""
     if end_date:
         end_sql = (
-            f"    AND ch.call_placed_datetime <= TIMESTAMP('{end_date} 23:59:59', 'America/Phoenix')"
+            "    AND TIMESTAMP(ch.call_placed_datetime, 'America/Phoenix') "
+            f"<= TIMESTAMP('{end_date} 23:59:59', 'America/Phoenix')"
         )
     refi_sql = ""
     if refi_only:
@@ -69,10 +70,16 @@ def render_template(template_path: Path, start_date: str, end_date: str | None, 
       UPPER(TRIM(COALESCE(a.loan_purpose, a15.loan_purpose, ''))) LIKE '%REFI%'
       OR UPPER(TRIM(COALESCE(a.loan_purpose, a15.loan_purpose, ''))) LIKE '%REFIN%'
     )"""
+    history_ts_expr = (
+        "TIMESTAMP(COALESCE("
+        "h.record_start_datetime, h.modified_datetime, h.created_datetime"
+        "), 'America/Phoenix')"
+    )
     return (
         text.replace("__COHORT_START__", start_date)
         .replace("__COHORT_END_SQL__", end_sql)
         .replace("__REFI_ONLY_SQL__", refi_sql)
+        .replace("__HISTORY_TS_EXPR__", history_ts_expr)
     )
 
 
