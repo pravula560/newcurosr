@@ -233,53 +233,9 @@ agent_transfers AS (
     AND loan_officer_assignment != prior_loan_officer_assignment
 ),
 
--- Most recent ownership transfer before the first dialer contact.
-transfer_before_first_contact AS (
-  SELECT
-    fc.application_key,
-    fc.call_placed_datetime,
-    fc.dialer_agent_name,
-    fc.dialer_agent_id,
-    fc.campaign_name,
-    fc.manager_full_name,
-    fc.fplus_roster_team,
-    fc.fplus_roster_manager,
-    fc.fplus_roster_lo_name,
-    fc.loan_id,
-    fc.applicant_id,
-    fc.funded_date,
-    fc.final_loan_amount,
-    fc.prequal_submitted_datetime,
-    fc.product_line,
-    t.transfer_datetime,
-    t.from_agent_name,
-    t.to_agent_name,
-    TIMESTAMP_DIFF(fc.call_placed_datetime, t.transfer_datetime, HOUR) AS hours_transfer_to_contact,
-    CASE
-      WHEN fc.dialer_agent_name = t.to_agent_name THEN 'Gaining agent contacted'
-      WHEN fc.dialer_agent_name = t.from_agent_name THEN 'Losing agent contacted'
-      ELSE 'Other agent contacted'
-    END AS dialer_contact_by,
-    ROW_NUMBER() OVER (
-      PARTITION BY fc.application_key
-      ORDER BY t.transfer_datetime DESC
-    ) AS transfer_rank
-  FROM first_contacts fc
-  INNER JOIN agent_transfers t
-    ON fc.application_key = t.application_key
-    AND t.transfer_datetime < fc.call_placed_datetime
-),
-
-contact_transfer_detail AS (
-  SELECT *
-  FROM transfer_before_first_contact
-  WHERE transfer_rank = 1
-),
-
 lo_at_contact AS (
   SELECT
     fc.application_key,
-    fc.call_placed_datetime,
     hr.loan_officer_assignment AS lo_at_contact
   FROM first_contacts fc
   LEFT JOIN application_history_ranked hr
@@ -289,34 +245,132 @@ lo_at_contact AS (
     PARTITION BY fc.application_key
     ORDER BY hr.history_effective_datetime DESC
   ) = 1
+),
+
+-- Most recent ownership transfer before the first dialer contact.
+transfer_before_first_contact AS (
+  SELECT
+    fc.application_key,
+    t.transfer_datetime AS pre_contact_transfer_datetime,
+    t.from_agent_name AS pre_contact_losing_agent,
+    t.to_agent_name AS pre_contact_gaining_agent,
+    TIMESTAMP_DIFF(fc.call_placed_datetime, t.transfer_datetime, HOUR) AS hours_transfer_to_contact,
+    CASE
+      WHEN fc.dialer_agent_name = t.to_agent_name THEN 'Gaining agent contacted'
+      WHEN fc.dialer_agent_name = t.from_agent_name THEN 'Losing agent contacted'
+      ELSE 'Other agent contacted'
+    END AS pre_contact_dialer_by
+  FROM first_contacts fc
+  INNER JOIN agent_transfers t
+    ON fc.application_key = t.application_key
+    AND t.transfer_datetime < fc.call_placed_datetime
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY fc.application_key
+    ORDER BY t.transfer_datetime DESC
+  ) = 1
+),
+
+-- First ownership transfer after the first dialer contact.
+transfer_after_first_contact AS (
+  SELECT
+    fc.application_key,
+    t.transfer_datetime AS post_contact_transfer_datetime,
+    t.from_agent_name AS post_contact_losing_agent,
+    t.to_agent_name AS post_contact_gaining_agent,
+    TIMESTAMP_DIFF(t.transfer_datetime, fc.call_placed_datetime, HOUR) AS hours_contact_to_transfer,
+    CASE
+      WHEN fc.dialer_agent_name = t.to_agent_name THEN 'Gaining agent was dialer contact'
+      WHEN fc.dialer_agent_name = t.from_agent_name THEN 'Losing agent was dialer contact'
+      ELSE 'Other agent was dialer contact'
+    END AS post_contact_dialer_by
+  FROM first_contacts fc
+  INNER JOIN agent_transfers t
+    ON fc.application_key = t.application_key
+    AND t.transfer_datetime > fc.call_placed_datetime
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY fc.application_key
+    ORDER BY t.transfer_datetime ASC
+  ) = 1
+),
+
+contact_transfer_detail AS (
+  SELECT
+    fc.application_key,
+    fc.loan_id,
+    fc.applicant_id,
+    fc.product_line,
+    fc.campaign_name,
+    fc.call_placed_datetime,
+    lac.lo_at_contact,
+    fc.dialer_agent_id,
+    fc.dialer_agent_name,
+    fc.manager_full_name,
+    fc.fplus_roster_team,
+    fc.fplus_roster_manager,
+    fc.fplus_roster_lo_name,
+    fc.prequal_submitted_datetime,
+    fc.funded_date,
+    fc.final_loan_amount,
+    pre.pre_contact_transfer_datetime,
+    pre.pre_contact_losing_agent,
+    pre.pre_contact_gaining_agent,
+    pre.hours_transfer_to_contact,
+    pre.pre_contact_dialer_by,
+    post.post_contact_transfer_datetime,
+    post.post_contact_losing_agent,
+    post.post_contact_gaining_agent,
+    post.hours_contact_to_transfer,
+    post.post_contact_dialer_by,
+    CASE
+      WHEN pre.application_key IS NOT NULL AND post.application_key IS NOT NULL
+        THEN 'Transfer before and after contact'
+      WHEN pre.application_key IS NOT NULL
+        THEN 'Transfer before contact only'
+      WHEN post.application_key IS NOT NULL
+        THEN 'Transfer after contact only'
+      ELSE 'No agent transfer'
+    END AS transfer_timing
+  FROM first_contacts fc
+  LEFT JOIN lo_at_contact lac
+    ON fc.application_key = lac.application_key
+  LEFT JOIN transfer_before_first_contact pre
+    ON fc.application_key = pre.application_key
+  LEFT JOIN transfer_after_first_contact post
+    ON fc.application_key = post.application_key
+  WHERE pre.application_key IS NOT NULL
+     OR post.application_key IS NOT NULL
 )
 
--- Detail grain: one row per contacted application with a pre-contact agent transfer.
+-- Detail grain: one row per contacted application with a pre- and/or post-contact transfer.
 SELECT
-  d.application_key,
-  d.loan_id,
-  d.applicant_id,
-  d.product_line,
-  d.campaign_name,
-  d.call_placed_datetime,
-  d.transfer_datetime,
-  d.hours_transfer_to_contact,
-  d.from_agent_name AS losing_agent,
-  d.to_agent_name AS gaining_agent,
-  lac.lo_at_contact,
-  d.dialer_agent_id,
-  d.dialer_agent_name,
-  d.dialer_contact_by,
-  d.manager_full_name,
-  d.fplus_roster_team,
-  d.fplus_roster_manager,
-  d.fplus_roster_lo_name,
-  d.prequal_submitted_datetime,
-  d.funded_date,
-  d.final_loan_amount,
-  CASE WHEN d.funded_date IS NOT NULL THEN 1 ELSE 0 END AS funded_flag
-FROM contact_transfer_detail d
-LEFT JOIN lo_at_contact lac
-  ON d.application_key = lac.application_key
-ORDER BY d.call_placed_datetime DESC
+  application_key,
+  loan_id,
+  applicant_id,
+  product_line,
+  campaign_name,
+  call_placed_datetime,
+  lo_at_contact,
+  transfer_timing,
+  pre_contact_transfer_datetime,
+  pre_contact_losing_agent,
+  pre_contact_gaining_agent,
+  hours_transfer_to_contact,
+  pre_contact_dialer_by,
+  post_contact_transfer_datetime,
+  post_contact_losing_agent,
+  post_contact_gaining_agent,
+  hours_contact_to_transfer,
+  post_contact_dialer_by,
+  dialer_agent_id,
+  dialer_agent_name,
+  manager_full_name,
+  fplus_roster_team,
+  fplus_roster_manager,
+  fplus_roster_lo_name,
+  prequal_submitted_datetime,
+  funded_date,
+  final_loan_amount,
+  CASE WHEN funded_date IS NOT NULL THEN 1 ELSE 0 END AS funded_flag
+FROM contact_transfer_detail
+ORDER BY call_placed_datetime DESC
 ;

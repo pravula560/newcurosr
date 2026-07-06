@@ -179,21 +179,19 @@ agent_transfers AS (
     AND loan_officer_assignment != prior_loan_officer_assignment
 ),
 
-contact_transfer_detail AS (
+transfer_before_first_contact AS (
   SELECT
     fc.application_key,
-    fc.call_placed_datetime,
     fc.dialer_agent_name,
     fc.funded_date,
-    t.transfer_datetime,
-    t.from_agent_name,
-    t.to_agent_name,
+    t.from_agent_name AS pre_contact_losing_agent,
+    t.to_agent_name AS pre_contact_gaining_agent,
     TIMESTAMP_DIFF(fc.call_placed_datetime, t.transfer_datetime, HOUR) AS hours_transfer_to_contact,
     CASE
       WHEN fc.dialer_agent_name = t.to_agent_name THEN 'Gaining agent contacted'
       WHEN fc.dialer_agent_name = t.from_agent_name THEN 'Losing agent contacted'
       ELSE 'Other agent contacted'
-    END AS dialer_contact_by
+    END AS pre_contact_dialer_by
   FROM first_contacts fc
   INNER JOIN agent_transfers t
     ON fc.application_key = t.application_key
@@ -202,58 +200,127 @@ contact_transfer_detail AS (
     PARTITION BY fc.application_key
     ORDER BY t.transfer_datetime DESC
   ) = 1
+),
+
+transfer_after_first_contact AS (
+  SELECT
+    fc.application_key,
+    fc.dialer_agent_name,
+    fc.funded_date,
+    t.from_agent_name AS post_contact_losing_agent,
+    t.to_agent_name AS post_contact_gaining_agent,
+    TIMESTAMP_DIFF(t.transfer_datetime, fc.call_placed_datetime, HOUR) AS hours_contact_to_transfer,
+    CASE
+      WHEN fc.dialer_agent_name = t.to_agent_name THEN 'Gaining agent was dialer contact'
+      WHEN fc.dialer_agent_name = t.from_agent_name THEN 'Losing agent was dialer contact'
+      ELSE 'Other agent was dialer contact'
+    END AS post_contact_dialer_by
+  FROM first_contacts fc
+  INNER JOIN agent_transfers t
+    ON fc.application_key = t.application_key
+    AND t.transfer_datetime > fc.call_placed_datetime
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY fc.application_key
+    ORDER BY t.transfer_datetime ASC
+  ) = 1
+),
+
+pre_contact_detail AS (
+  SELECT * FROM transfer_before_first_contact
+),
+
+post_contact_detail AS (
+  SELECT * FROM transfer_after_first_contact
 )
 
--- 1) Agents losing leads (transferred away before first dialer contact)
+-- 1) Agents losing leads BEFORE contact
 SELECT
-  'Agents Losing Leads' AS report_section,
-  from_agent_name AS agent_name,
+  'Agents Losing Leads (Before Contact)' AS report_section,
+  pre_contact_losing_agent AS agent_name,
   COUNT(DISTINCT application_key) AS leads,
-  COUNTIF(dialer_contact_by = 'Losing agent contacted') AS contacted_by_losing_agent,
-  COUNTIF(dialer_contact_by = 'Gaining agent contacted') AS contacted_by_gaining_agent,
-  COUNTIF(dialer_contact_by = 'Other agent contacted') AS contacted_by_other_agent,
-  ROUND(AVG(hours_transfer_to_contact), 1) AS avg_hours_transfer_to_contact,
+  COUNTIF(pre_contact_dialer_by = 'Losing agent contacted') AS dialer_was_losing_agent,
+  COUNTIF(pre_contact_dialer_by = 'Gaining agent contacted') AS dialer_was_gaining_agent,
+  COUNTIF(pre_contact_dialer_by = 'Other agent contacted') AS dialer_was_other_agent,
+  ROUND(AVG(hours_transfer_to_contact), 1) AS avg_hours_to_contact,
   COUNTIF(funded_date IS NOT NULL) AS funded_count,
   ROUND(
     100.0 * COUNTIF(funded_date IS NOT NULL) / NULLIF(COUNT(DISTINCT application_key), 0),
     1
   ) AS funded_rate_pct
-FROM contact_transfer_detail
+FROM pre_contact_detail
 GROUP BY 1, 2
 
 UNION ALL
 
--- 2) Agents gaining leads (received ownership before first dialer contact)
+-- 2) Agents gaining leads BEFORE contact
 SELECT
-  'Agents Gaining Leads' AS report_section,
-  to_agent_name AS agent_name,
+  'Agents Gaining Leads (Before Contact)' AS report_section,
+  pre_contact_gaining_agent AS agent_name,
   COUNT(DISTINCT application_key) AS leads,
-  COUNTIF(dialer_contact_by = 'Losing agent contacted') AS contacted_by_losing_agent,
-  COUNTIF(dialer_contact_by = 'Gaining agent contacted') AS contacted_by_gaining_agent,
-  COUNTIF(dialer_contact_by = 'Other agent contacted') AS contacted_by_other_agent,
-  ROUND(AVG(hours_transfer_to_contact), 1) AS avg_hours_transfer_to_contact,
+  COUNTIF(pre_contact_dialer_by = 'Losing agent contacted') AS dialer_was_losing_agent,
+  COUNTIF(pre_contact_dialer_by = 'Gaining agent contacted') AS dialer_was_gaining_agent,
+  COUNTIF(pre_contact_dialer_by = 'Other agent contacted') AS dialer_was_other_agent,
+  ROUND(AVG(hours_transfer_to_contact), 1) AS avg_hours_to_contact,
   COUNTIF(funded_date IS NOT NULL) AS funded_count,
   ROUND(
     100.0 * COUNTIF(funded_date IS NOT NULL) / NULLIF(COUNT(DISTINCT application_key), 0),
     1
   ) AS funded_rate_pct
-FROM contact_transfer_detail
+FROM pre_contact_detail
+GROUP BY 1, 2
+
+UNION ALL
+
+-- 3) Agents losing leads AFTER contact
+SELECT
+  'Agents Losing Leads (After Contact)' AS report_section,
+  post_contact_losing_agent AS agent_name,
+  COUNT(DISTINCT application_key) AS leads,
+  COUNTIF(post_contact_dialer_by = 'Losing agent was dialer contact') AS dialer_was_losing_agent,
+  COUNTIF(post_contact_dialer_by = 'Gaining agent was dialer contact') AS dialer_was_gaining_agent,
+  COUNTIF(post_contact_dialer_by = 'Other agent was dialer contact') AS dialer_was_other_agent,
+  ROUND(AVG(hours_contact_to_transfer), 1) AS avg_hours_to_contact,
+  COUNTIF(funded_date IS NOT NULL) AS funded_count,
+  ROUND(
+    100.0 * COUNTIF(funded_date IS NOT NULL) / NULLIF(COUNT(DISTINCT application_key), 0),
+    1
+  ) AS funded_rate_pct
+FROM post_contact_detail
+GROUP BY 1, 2
+
+UNION ALL
+
+-- 4) Agents gaining leads AFTER contact
+SELECT
+  'Agents Gaining Leads (After Contact)' AS report_section,
+  post_contact_gaining_agent AS agent_name,
+  COUNT(DISTINCT application_key) AS leads,
+  COUNTIF(post_contact_dialer_by = 'Losing agent was dialer contact') AS dialer_was_losing_agent,
+  COUNTIF(post_contact_dialer_by = 'Gaining agent was dialer contact') AS dialer_was_gaining_agent,
+  COUNTIF(post_contact_dialer_by = 'Other agent was dialer contact') AS dialer_was_other_agent,
+  ROUND(AVG(hours_contact_to_transfer), 1) AS avg_hours_to_contact,
+  COUNTIF(funded_date IS NOT NULL) AS funded_count,
+  ROUND(
+    100.0 * COUNTIF(funded_date IS NOT NULL) / NULLIF(COUNT(DISTINCT application_key), 0),
+    1
+  ) AS funded_rate_pct
+FROM post_contact_detail
 GROUP BY 1, 2
 
 ORDER BY report_section, leads DESC
 ;
 
--- Transfer flow matrix (run separately if needed):
+-- Post-contact transfer flow matrix (run separately if needed):
 -- SELECT
---   from_agent_name,
---   to_agent_name,
+--   post_contact_losing_agent AS from_agent_name,
+--   post_contact_gaining_agent AS to_agent_name,
 --   COUNT(DISTINCT application_key) AS leads_transferred,
---   COUNTIF(dialer_contact_by = 'Gaining agent contacted') AS gaining_agent_contacted,
+--   COUNTIF(post_contact_dialer_by = 'Gaining agent was dialer contact') AS gaining_agent_was_dialer,
 --   ROUND(
---     100.0 * COUNTIF(dialer_contact_by = 'Gaining agent contacted')
+--     100.0 * COUNTIF(post_contact_dialer_by = 'Gaining agent was dialer contact')
 --     / NULLIF(COUNT(DISTINCT application_key), 0),
 --     1
---   ) AS pct_gaining_agent_contacted
--- FROM contact_transfer_detail
+--   ) AS pct_gaining_agent_was_dialer
+-- FROM post_contact_detail
 -- GROUP BY 1, 2
 -- ORDER BY leads_transferred DESC;
