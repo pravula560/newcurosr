@@ -14,7 +14,8 @@ generate a fully-rendered SQL query for the APL trifurcated funnel dashboard.
 ## Refi dialer agent transfer report
 
 Detects `loan_officer_assignment` changes in `fplus_application_history` for dialer-contacted
-applications and summarizes which agents lose vs gain ownership before first contact.
+applications (from `inin_dialer_history` directly) and summarizes which agents lose vs gain
+ownership before and after first contact.
 
 ```bash
 python run_refi_dialer_agent_transfer_report.py \

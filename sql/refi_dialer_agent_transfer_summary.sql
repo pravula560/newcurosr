@@ -1,7 +1,5 @@
--- Refi / FPlus dialer leads: agent transfer summary (losers / gainers / flow matrix).
--- Uses the same CTE pipeline as refi_dialer_agent_transfer_report.sql through contact_transfer_detail.
---
--- Run in BigQuery after validating history timestamp columns (see detail query header).
+-- Refi / FPlus dialer leads: agent transfer summary (losers / gainers).
+-- Reads dialer contacts directly from inin_dialer_history (no dialer_campaign_stats).
 
 WITH dialer_campaigns AS (
   SELECT campaign_name
@@ -31,85 +29,10 @@ WITH dialer_campaigns AS (
   ]) AS campaign_name
 ),
 
-dialer_campaign_stats AS (
-  WITH dialer_start_end AS (
-    WITH dialer_start AS (
-      SELECT
-        RANK() OVER (
-          PARTITION BY campaign_name
-          ORDER BY campaign_start_date_time ASC
-        ) AS rank,
-        campaign_name,
-        campaign_start_date_time AS campaign_start_date_time1,
-        campaign_end_date_time AS campaign_end_date_time1,
-        TIMESTAMP(campaign_start_date_time, 'America/Phoenix') AS campaign_start_date_time,
-        TIMESTAMP(campaign_end_date_time, 'America/Phoenix') AS campaign_end_date_time
-      FROM `ffn-data-platform.standardized_data.dialer_campaign_stats`
-      WHERE DATE(TIMESTAMP(campaign_start_date_time, 'America/Phoenix')) > DATE '2025-01-01'
-        AND campaign_name IN (SELECT campaign_name FROM dialer_campaigns)
-    ),
-    dialer_end AS (
-      SELECT
-        RANK() OVER (
-          PARTITION BY campaign_name
-          ORDER BY campaign_start_date_time ASC
-        ) AS rank,
-        campaign_name,
-        campaign_end_date_time AS campaign_end_date_time1
-      FROM `ffn-data-platform.standardized_data.dialer_campaign_stats`
-      WHERE DATE(TIMESTAMP(campaign_start_date_time, 'America/Phoenix')) > DATE '2020-09-03'
-        AND campaign_event IN ('Pause')
-        AND campaign_state = 'Paused'
-        AND campaign_name IN (SELECT campaign_name FROM dialer_campaigns)
-    )
-    SELECT
-      s.campaign_name,
-      s.campaign_end_date_time1 AS start_run_time,
-      e.campaign_end_date_time1 AS end_run_time
-    FROM dialer_start s
-    INNER JOIN dialer_end e
-      ON s.rank = e.rank
-      AND s.campaign_name = e.campaign_name
-  )
-  SELECT
-    CASE
-      WHEN TIMESTAMP(cs.campaign_start_date_time, 'America/Phoenix') <= TIMESTAMP('2021-12-08', 'America/Phoenix')
-        THEN TIMESTAMP(d.start_run_time, 'America/Phoenix')
-      WHEN TIMESTAMP(cs.campaign_start_date_time, 'America/Phoenix') > TIMESTAMP('2021-12-08', 'America/Phoenix')
-        AND TIMESTAMP_DIFF(
-          TIMESTAMP(cs.campaign_end_date_time, 'America/Phoenix'),
-          TIMESTAMP(cs.campaign_start_date_time, 'America/Phoenix'),
-          MINUTE
-        ) >= 30
-        THEN TIMESTAMP(cs.campaign_start_date_time, 'America/Phoenix')
-      ELSE NULL
-    END AS start_run_time,
-    CASE
-      WHEN TIMESTAMP(cs.campaign_start_date_time, 'America/Phoenix') <= TIMESTAMP('2021-12-08', 'America/Phoenix')
-        THEN TIMESTAMP(d.end_run_time, 'America/Phoenix')
-      WHEN TIMESTAMP(cs.campaign_start_date_time, 'America/Phoenix') > TIMESTAMP('2021-12-08', 'America/Phoenix')
-        AND TIMESTAMP_DIFF(
-          TIMESTAMP(cs.campaign_end_date_time, 'America/Phoenix'),
-          TIMESTAMP(cs.campaign_start_date_time, 'America/Phoenix'),
-          MINUTE
-        ) >= 30
-        THEN TIMESTAMP(cs.campaign_end_date_time, 'America/Phoenix')
-      ELSE NULL
-    END AS end_run_time,
-    cs.campaign_name
-  FROM `ffn-data-platform.standardized_data.dialer_campaign_stats` cs
-  LEFT JOIN dialer_start_end d
-    ON d.campaign_name = cs.campaign_name
-  WHERE cs.campaign_name IN (SELECT campaign_name FROM dialer_campaigns)
-  GROUP BY 1, 2, 3
-),
-
 dialer_contacts AS (
   SELECT
-    ch.source_system_id,
     ch.call_placed_datetime,
     ch.campaign_name,
-    ch.agent_id AS dialer_agent_id,
     e.full_name AS dialer_agent_name,
     COALESCE(a.application_key, a15.application_key) AS application_key,
     COALESCE(a.funded_date, a15.funded_date) AS funded_date,
@@ -117,10 +40,9 @@ dialer_contacts AS (
       PARTITION BY COALESCE(a.application_key, a15.application_key)
       ORDER BY ch.call_placed_datetime ASC
     ) AS contact_rank
-  FROM dialer_campaign_stats d
-  INNER JOIN `ffam-data-platform.standardized_data.inin_dialer_history` ch
-    ON d.campaign_name = ch.campaign_name
-    AND ch.call_placed_datetime BETWEEN d.start_run_time AND d.end_run_time
+  FROM `ffam-data-platform.standardized_data.inin_dialer_history` ch
+  INNER JOIN dialer_campaigns dc
+    ON ch.campaign_name = dc.campaign_name
   LEFT JOIN `ffam-data-platform.standardized_data.employee_history` e
     ON ch.agent_id = e.inin_username
     AND e.is_active_rec = 1
@@ -129,7 +51,7 @@ dialer_contacts AS (
   LEFT JOIN `ffam-data-platform.standardized_data.fplus_application` a15
     ON a.application_key IS NULL
     AND ch.source_system_id = SUBSTR(a15.application_key, 1, 15)
-  WHERE d.start_run_time >= TIMESTAMP('__COHORT_START__', 'America/Phoenix')
+  WHERE ch.call_placed_datetime >= TIMESTAMP('__COHORT_START__', 'America/Phoenix')
 __COHORT_END_SQL__
     AND COALESCE(a.application_key, a15.application_key) IS NOT NULL
     AND (
@@ -233,7 +155,6 @@ post_contact_detail AS (
   SELECT * FROM transfer_after_first_contact
 )
 
--- 1) Agents losing leads BEFORE contact
 SELECT
   'Agents Losing Leads (Before Contact)' AS report_section,
   pre_contact_losing_agent AS agent_name,
@@ -252,7 +173,6 @@ GROUP BY 1, 2
 
 UNION ALL
 
--- 2) Agents gaining leads BEFORE contact
 SELECT
   'Agents Gaining Leads (Before Contact)' AS report_section,
   pre_contact_gaining_agent AS agent_name,
@@ -271,7 +191,6 @@ GROUP BY 1, 2
 
 UNION ALL
 
--- 3) Agents losing leads AFTER contact
 SELECT
   'Agents Losing Leads (After Contact)' AS report_section,
   post_contact_losing_agent AS agent_name,
@@ -290,7 +209,6 @@ GROUP BY 1, 2
 
 UNION ALL
 
--- 4) Agents gaining leads AFTER contact
 SELECT
   'Agents Gaining Leads (After Contact)' AS report_section,
   post_contact_gaining_agent AS agent_name,
@@ -309,18 +227,3 @@ GROUP BY 1, 2
 
 ORDER BY report_section, leads DESC
 ;
-
--- Post-contact transfer flow matrix (run separately if needed):
--- SELECT
---   post_contact_losing_agent AS from_agent_name,
---   post_contact_gaining_agent AS to_agent_name,
---   COUNT(DISTINCT application_key) AS leads_transferred,
---   COUNTIF(post_contact_dialer_by = 'Gaining agent was dialer contact') AS gaining_agent_was_dialer,
---   ROUND(
---     100.0 * COUNTIF(post_contact_dialer_by = 'Gaining agent was dialer contact')
---     / NULLIF(COUNT(DISTINCT application_key), 0),
---     1
---   ) AS pct_gaining_agent_was_dialer
--- FROM post_contact_detail
--- GROUP BY 1, 2
--- ORDER BY leads_transferred DESC;

@@ -60,7 +60,7 @@ def render_template(template_path: Path, start_date: str, end_date: str | None, 
     end_sql = ""
     if end_date:
         end_sql = (
-            f"    AND d.start_run_time <= TIMESTAMP('{end_date} 23:59:59', 'America/Phoenix')"
+            f"    AND ch.call_placed_datetime <= TIMESTAMP('{end_date} 23:59:59', 'America/Phoenix')"
         )
     refi_sql = ""
     if refi_only:
