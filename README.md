@@ -7,6 +7,39 @@ generate a fully-rendered SQL query for the APL trifurcated funnel dashboard.
 
 - `sql/apl_trifurcated_funnel_dashboard_extract.sql`: SQL template with placeholders.
 - `run_apl_trifurcated_funnel.py`: CLI helper that injects filter placeholders.
+- `sql/refi_dialer_agent_transfer_report.sql`: Dialer contacted leads with pre-contact LO transfer (detail grain).
+- `sql/refi_dialer_agent_transfer_summary.sql`: Agent loser/gainer summary from application history changes.
+- `run_refi_dialer_agent_transfer_report.py`: Renders the dialer agent transfer SQL templates.
+
+## Refi dialer agent transfer report
+
+Detects `loan_officer_assignment` changes in `fplus_application_history` for dialer-contacted
+applications (from `inin_dialer_history` directly) and summarizes which agents lose vs gain
+ownership before and after first contact.
+
+```bash
+python run_refi_dialer_agent_transfer_report.py \
+  --start-date 2026-01-01 \
+  --end-date 2026-03-31 \
+  --refi-only
+```
+
+Generated SQL is written to `dist/refi_dialer_agent_transfer_report.generated.sql` (detail)
+and `dist/refi_dialer_agent_transfer_summary.generated.sql` (agent loser/gainer rollup).
+
+Before first run, confirm the history ordering column in BigQuery:
+
+```sql
+SELECT column_name, data_type
+FROM `ffam-data-platform.standardized_data.INFORMATION_SCHEMA.COLUMNS`
+WHERE table_name = 'fplus_application_history'
+  AND column_name IN (
+    'loan_officer_assignment', 'record_start_datetime',
+    'modified_datetime', 'created_datetime'
+  );
+```
+
+If needed, update `history_effective_datetime` in the SQL templates.
 
 ## Usage
 
